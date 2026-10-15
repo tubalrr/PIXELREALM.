@@ -50,6 +50,12 @@ Download `index.html` and `game.js` into the same folder, then open `index.html`
 10. Use **Return home** to order an army back to its realm's capital. **Disband army** returns half its remaining troops to the reserve.
 11. Use **Play** or **Advance year** to progress the simulation, and **Save world** to download a JSON save that can be imported later.
 
+## Living-world details
+
+- Market stalls animate their produce, awnings, pennants, and small coin glints. Villagers are more likely to walk toward commercial districts and briefly duck out of sight during a market visit before continuing their route.
+- Upgraded cities display animated realm pennants and occasional window glints. Trade and alliance routes flow across the map, while siege markers pulse during active wars.
+- These are presentation-only effects: they do not change the economic or military simulation rules.
+
 ## Prototype limitations
 
 This is an early client-side prototype. Terrain and building graphics are handmade pixel patterns drawn directly on the canvas, rather than external sprite images. Armies use small pixel-art soldier markers with subtle idle movement; units are still markers rather than multi-soldier formations. Battle outcomes and political events use lightweight simulation rules rather than a full historical or economic model. There is no multiplayer, cloud save, user account system, or online community backend yet.
