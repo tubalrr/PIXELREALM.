@@ -933,7 +933,7 @@ function expandRealm(k){
  if(rand()<.055){t.settlement=true;t.cityLevel=1;k.population+=Math.floor(300+rand()*900);addEvent(k.name+' founded a new frontier settlement.');}
  else if(rand()<.04)t.fort=true;
 }
-function saveData() { return { version: 5, w, h, year, tiles, kingdoms, events, selected, opponent, diplomacy, armies, nextArmyId, selectedArmyId }; }
+function saveData() { return { version: 6, w, h, year, tiles, kingdoms, events, selected, opponent, diplomacy, armies, nextArmyId, selectedArmyId }; }
 function saveLocalWorld() { try { localStorage.setItem('pixelrealm-autosave', JSON.stringify(saveData())); } catch (err) { /* Browser storage can be unavailable for local files/private browsing. */ } }
 function applyWorldState(s) {
   if (!s || !Array.isArray(s.tiles) || !Array.isArray(s.kingdoms) || !Number.isInteger(s.w) || !Number.isInteger(s.h) || s.tiles.length !== s.w * s.h || s.kingdoms.length !== 5) throw new Error('Invalid save');
