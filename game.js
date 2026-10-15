@@ -370,7 +370,8 @@ function chooseVillagerTarget(v) {
     const score = p => {
       const t = terrainAt(p[0],p[1]);
       return (t.road ? 3 : 0) + (t.settlement ? 2 : 0) +
-        (t.zone === 'residential' || t.zone === 'commercial' ? 1 : 0) + Math.random() * 0.35;
+        (t.building === 'market' ? 6 : 0) + (t.zone === 'commercial' ? 4 : 0) +
+        (t.zone === 'residential' ? 1 : 0) + Math.random() * 0.35;
     };
     return score(b) - score(a);
   });
@@ -385,11 +386,15 @@ function updateVillagers() {
     const dx = v.targetX - v.x, dy = v.targetY - v.y;
     const distance = Math.hypot(dx,dy);
     if (distance < 0.045) {
-      v.pause = 2 + Math.floor(Math.random() * 8);
+      const arrived = terrainAt(Math.max(0, Math.min(w - 1, Math.floor(v.x))), Math.max(0, Math.min(h - 1, Math.floor(v.y))));
+      v.shopping = arrived.building === 'market' || arrived.zone === 'commercial';
+      v.pause = 2 + Math.floor(Math.random() * (v.shopping ? 10 : 8));
       chooseVillagerTarget(v);
       v.walkPhase = 0;
       continue;
     }
+    // Clear the shopping state when the villager leaves the current stop.
+    v.shopping = false;
     const speed = 0.055;
     v.x += dx / distance * Math.min(speed,distance);
     v.y += dy / distance * Math.min(speed,distance);
@@ -401,6 +406,14 @@ function drawVillagers() {
   for (const v of villagers) {
     if (!inBounds(Math.floor(v.x), Math.floor(v.y))) continue;
     const centerX = Math.round(v.x * TILE), topY = Math.round(v.y * TILE) - 6, leftX = centerX - 4;
+    // Briefly duck out of sight on a market visit, then reappear with a little parcel.
+    if (v.shopping && v.pause > 0 && visualFrame % 8 < 2) {
+      if (visualFrame % 8 === 0) {
+        ctx.fillStyle = '#d9bd64'; ctx.fillRect(centerX + 2, topY + 8, 2, 2);
+        ctx.fillStyle = '#fff0b4'; ctx.fillRect(centerX + 2, topY + 8, 1, 1);
+      }
+      continue;
+    }
     const walking = v.walkPhase > 0 && visualFrame % 4 < 2;
     const sprite = walking ? SPRITES.villagerB : SPRITES.villagerA;
     const palette = { h: '#d6ba8b', p: '#554233', s: COLORS[v.owner], y: '#d4be84', b: '#3b3329' };
@@ -419,6 +432,28 @@ function animateVisuals(timestamp) {
     renderMap();
   }
   if (typeof requestAnimationFrame === 'function') requestAnimationFrame(animateVisuals);
+}
+function drawMarketActivity(t, px, py) {
+  const phase = visualFrame % 8;
+  // A tiny striped counter and rotating produce pixels make markets feel occupied.
+  ctx.fillStyle = '#3d3328'; ctx.fillRect(px + 4, py + 8, 8, 2);
+  for (let i = 0; i < 4; i++) {
+    ctx.fillStyle = (i + Math.floor(phase / 2)) % 2 === 0 ? '#b65045' : '#e5d6ae';
+    ctx.fillRect(px + 4 + i * 2, py + 6, 2, 2);
+  }
+  ctx.fillStyle = '#d8bd69'; ctx.fillRect(px + 5, py + 8, 2, 1);
+  ctx.fillStyle = phase < 4 ? '#82a95a' : '#d9a65b';
+  ctx.fillRect(px + 8, py + 7, 2, 2);
+  ctx.fillStyle = phase < 4 ? '#d9a65b' : '#82a95a';
+  ctx.fillRect(px + 10, py + 7, 1, 2);
+  // A small shop pennant and coin glint pulse on a slow cycle.
+  ctx.fillStyle = '#544232'; ctx.fillRect(px + 12, py + 1, 1, 4);
+  ctx.fillStyle = phase < 4 ? '#e4c579' : '#b65a4a';
+  ctx.fillRect(px + 13, py + 1 + (phase % 4 === 0 ? 1 : 0), 2, 2);
+  if (phase === 0 || phase === 1) {
+    ctx.fillStyle = '#fff0ad'; ctx.fillRect(px + 1, py + 2, 1, 1);
+    ctx.fillStyle = '#e4c579'; ctx.fillRect(px + 2, py + 1, 1, 1);
+  }
 }
 function drawTile(t, x, y) {
   const px = x * TILE, py = y * TILE;
@@ -566,15 +601,30 @@ function drawTile(t, x, y) {
     ctx.fillStyle = '#f0dd9a';
     for (let levelIndex = 0; levelIndex < level; levelIndex++) ctx.fillRect(px + 2 + levelIndex * 4, py + 14, 2, 1);
   }
+
+  // Taller cities get a fluttering pennant; busy commercial tiles get stall animation.
+  if (t.owner >= 0 && t.settlement && (Number(t.cityLevel) || 1) >= 2) {
+    const flagY = visualFrame % 4 === 0 ? 1 : 2;
+    ctx.fillStyle = '#3e3529'; ctx.fillRect(px + 13, py + 1, 1, 4);
+    ctx.fillStyle = COLORS[t.owner]; ctx.fillRect(px + 14, py + flagY, 1, 2);
+    ctx.fillStyle = '#f0dc9e'; ctx.fillRect(px + 14, py + flagY, 1, 1);
+    if ((Number(t.cityLevel) || 1) >= 3 && visualFrame % 8 < 2) {
+      ctx.fillStyle = '#fff0b4'; ctx.fillRect(px + 5, py + 7, 1, 1);
+      ctx.fillRect(px + 10, py + 9, 1, 1);
+    }
+  }
+  if (t.owner >= 0 && (t.building === 'market' || t.zone === 'commercial')) drawMarketActivity(t, px, py);
 }
 function renderMap() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) drawTile(terrainAt(x, y), x, y);
   ctx.save(); ctx.lineWidth = 2; ctx.setLineDash([4, 4]);
+  ctx.lineDashOffset = -(visualFrame % 8);
   diplomacy.tradePacts.forEach(t => {
     const a = realm(t.a), b = realm(t.b); if (!a || !b) return;
     ctx.strokeStyle = '#e4c579'; ctx.beginPath(); ctx.moveTo(a.x * TILE + 8, a.y * TILE + 8); ctx.lineTo(b.x * TILE + 8, b.y * TILE + 8); ctx.stroke();
   });
+  ctx.lineDashOffset = visualFrame % 8;
   diplomacy.alliances.forEach(t => {
     const a = realm(t.a), b = realm(t.b); if (!a || !b) return;
     ctx.strokeStyle = '#9bc98b'; ctx.beginPath(); ctx.moveTo(a.x * TILE + 8, a.y * TILE + 8); ctx.lineTo(b.x * TILE + 8, b.y * TILE + 8); ctx.stroke();
@@ -583,8 +633,10 @@ function renderMap() {
   diplomacy.wars.forEach(war => (war.sieges || []).forEach(siege => {
     const x = siege.tileIndex % w, y = Math.floor(siege.tileIndex / w);
     if (!tiles[siege.tileIndex]) return;
-    ctx.strokeStyle = '#f5d28a'; ctx.lineWidth = 2; ctx.strokeRect(x * TILE + 2, y * TILE + 2, TILE - 4, TILE - 4);
-    ctx.fillStyle = '#f5d28a'; ctx.fillRect(x * TILE + 5, y * TILE + 5, 6, 2);
+    const siegePulse = visualFrame % 8 < 4;
+    ctx.strokeStyle = siegePulse ? '#fff0ad' : '#c99a48'; ctx.lineWidth = siegePulse ? 2 : 1;
+    ctx.strokeRect(x * TILE + 2, y * TILE + 2, TILE - 4, TILE - 4);
+    ctx.fillStyle = siegePulse ? '#fff0ad' : '#f5d28a'; ctx.fillRect(x * TILE + 5, y * TILE + 5, 6, 2);
   }));
   kingdoms.forEach(k => {
     if (!k.alive) return;
