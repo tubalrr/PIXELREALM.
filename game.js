@@ -195,7 +195,7 @@ const SPRITES = {
     'dddddddddddddd',
     '..ddddd..ddddd',
     '..rrrrr..rrrrr',
-    '.rrrrrr..rrrrrr',
+    '.rrrrr..rrrrrr',
     'rrrrrrrrrrrrrr',
     'rrrrrrrrrrrrrr'
   ],
@@ -260,7 +260,7 @@ const SPRITES = {
     '.srrrbbbbrs.',
     'ssbbbbbbbbss',
     '..bbbyybb...',
-    '..bbbyybb....',
+    '..bbbyybb...',
     '..bbbbbbbb..',
     '...bbbbbb...'
   ],
