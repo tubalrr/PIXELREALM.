@@ -26,7 +26,9 @@ function realm(id) { return kingdoms[id]; }
 function territoryCount(id) { let n = 0; for (const t of tiles) if (t.owner === id) n++; return n; }
 function settlementCount(id) { let n = 0; for (const t of tiles) if (t.owner === id && t.settlement) n++; return n; }
 function developmentStats(id) {
-  const stats = { roads: 0, farms: 0, mines: 0, markets: 0, cityLevels: 0, roadLinkedCities: 0 };
+  const stats = { roads: 0, farms: 0, mines: 0, markets: 0, cityLevels: 0, roadLinkedCities: 0,
+    residentialZones: 0, commercialZones: 0, industrialZones: 0, districtLevels: 0,
+    housingCapacity: 0, commercialOutput: 0, industrialOutput: 0 };
   for (let i = 0; i < tiles.length; i++) {
     const t = tiles[i];
     if (t.owner !== id) continue;
@@ -34,6 +36,13 @@ function developmentStats(id) {
     if (t.building === 'farm') stats.farms++;
     if (t.building === 'mine') stats.mines++;
     if (t.building === 'market') stats.markets++;
+    if (t.zone) {
+      const level = Math.max(1, Math.min(3, Math.floor(Number(t.zoneLevel) || 1)));
+      stats.districtLevels += level;
+      if (t.zone === 'residential') { stats.residentialZones++; stats.housingCapacity += level * 350; }
+      if (t.zone === 'commercial') { stats.commercialZones++; stats.commercialOutput += level * 12; }
+      if (t.zone === 'industrial') { stats.industrialZones++; stats.industrialOutput += level * 16; }
+    }
     if (t.settlement) {
       stats.cityLevels += Math.max(0, (Number(t.cityLevel) || 1) - 1);
       const x = i % w, y = Math.floor(i / w);
@@ -87,7 +96,7 @@ function genWorld() {
     const edge = Math.min(x, y, w - 1 - x, h - 1 - y);
     const n = rand();
     const water = (edge < 2 && n < 0.75) || n < 0.12;
-    return { terrain: water ? 'water' : n > 0.91 ? 'mountain' : n > 0.70 ? 'forest' : 'grass', owner: -1, settlement: false, cityLevel: 0, fort: false, road: false, building: null, resource: rand() > 0.75 ? 'ore' : rand() > 0.65 ? 'food' : 'none', rebel: false };
+    return { terrain: water ? 'water' : n > 0.91 ? 'mountain' : n > 0.70 ? 'forest' : 'grass', owner: -1, settlement: false, cityLevel: 0, fort: false, road: false, building: null, zone: null, zoneLevel: 0, resource: rand() > 0.75 ? 'ore' : rand() > 0.65 ? 'food' : 'none', rebel: false };
   });
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     const t = terrainAt(x, y);
@@ -167,6 +176,16 @@ function drawTile(t, x, y) {
     const tier = Math.max(1, Math.min(3, Number(t.cityLevel) || 1));
     ctx.fillStyle = '#e4c579';
     for (let level = 0; level < tier; level++) ctx.fillRect(px + 2 + level * 3, py + 13, 2, 2);
+    if (tier >= 2) {
+      ctx.fillStyle = '#d8c59a'; ctx.fillRect(px + 10, py + 3, 4, 5);
+      ctx.fillStyle = '#8e4942'; ctx.fillRect(px + 9, py + 2, 6, 2);
+      ctx.fillStyle = '#f0dfb2'; ctx.fillRect(px + 11, py + 5, 1, 2);
+    }
+    if (tier >= 3) {
+      ctx.fillStyle = '#dbc89b'; ctx.fillRect(px + 2, py + 1, 4, 7);
+      ctx.fillStyle = '#b96d56'; ctx.fillRect(px + 1, py, 6, 2);
+      ctx.fillStyle = '#f0dfb2'; ctx.fillRect(px + 3, py + 3, 1, 2);
+    }
   }
   if (t.building === 'farm') {
     ctx.fillStyle = '#b4c47c'; ctx.fillRect(px + 3, py + 3, 10, 8);
@@ -179,6 +198,29 @@ function drawTile(t, x, y) {
     ctx.fillStyle = '#d9c79a'; ctx.fillRect(px + 4, py + 7, 8, 6);
     ctx.fillStyle = '#b96d56'; ctx.fillRect(px + 3, py + 4, 10, 3);
     ctx.fillStyle = '#f0dfb2'; ctx.fillRect(px + 5, py + 5, 2, 2); ctx.fillRect(px + 9, py + 5, 2, 2);
+  }
+  if (t.zone && t.owner >= 0) {
+    const level = Math.max(1, Math.min(3, Number(t.zoneLevel) || 1));
+    if (t.zone === 'residential') {
+      ctx.fillStyle = '#d5c39a'; ctx.fillRect(px + 2, py + 7, 5, 6);
+      ctx.fillStyle = '#b86d58'; ctx.fillRect(px + 1, py + 5, 7, 3);
+      if (level >= 2) { ctx.fillStyle = '#e1d3ad'; ctx.fillRect(px + 9, py + 5, 5, 8); ctx.fillStyle = '#a95449'; ctx.fillRect(px + 8, py + 3, 7, 3); }
+      if (level >= 3) { ctx.fillStyle = '#d4c49f'; ctx.fillRect(px + 5, py + 1, 5, 5); ctx.fillStyle = '#cfb977'; ctx.fillRect(px + 4, py, 7, 2); }
+    } else if (t.zone === 'commercial') {
+      ctx.fillStyle = '#e0c98f'; ctx.fillRect(px + 3, py + 6, 10, 7);
+      ctx.fillStyle = '#ad6752'; ctx.fillRect(px + 2, py + 4, 12, 3);
+      ctx.fillStyle = '#f5e6bc'; ctx.fillRect(px + 4, py + 8, 2, 3); ctx.fillRect(px + 8, py + 8, 3, 2);
+      if (level >= 2) { ctx.fillStyle = '#d7c6a0'; ctx.fillRect(px + 9, py + 1, 5, 5); ctx.fillStyle = '#e4c579'; ctx.fillRect(px + 8, py, 7, 2); }
+      if (level >= 3) { ctx.fillStyle = '#f0dfb2'; ctx.fillRect(px + 5, py + 2, 2, 2); }
+    } else if (t.zone === 'industrial') {
+      ctx.fillStyle = '#7c8b7f'; ctx.fillRect(px + 2, py + 7, 12, 6);
+      ctx.fillStyle = '#505e56'; ctx.fillRect(px + 4, py + 4, 5, 4); ctx.fillRect(px + 10, py + 2, 3, 6);
+      ctx.fillStyle = '#c7c8b4'; ctx.fillRect(px + 10, py + 1, 3, 2);
+      if (level >= 2) { ctx.fillStyle = '#9ba79b'; ctx.fillRect(px + 1, py + 5, 3, 4); ctx.fillStyle = '#d8dccf'; ctx.fillRect(px + 1, py + 3, 3, 2); }
+      if (level >= 3) { ctx.fillStyle = '#727f76'; ctx.fillRect(px + 7, py + 2, 2, 5); ctx.fillStyle = '#ced3c8'; ctx.fillRect(px + 6, py + 1, 4, 2); }
+    }
+    ctx.fillStyle = '#f5e6bd';
+    for (let levelIndex = 0; levelIndex < level; levelIndex++) ctx.fillRect(px + 2 + levelIndex * 4, py + 14, 2, 1);
   }
 }
 function renderMap() {
@@ -253,7 +295,9 @@ function renderInfo() {
     '<div class="sectionlabel">City development</div><div class="realmmeta">' +
     '<div><small>Roads</small><strong>' + dev.roads + '</strong></div><div><small>Farms</small><strong>' + dev.farms + '</strong></div>' +
     '<div><small>Mines</small><strong>' + dev.mines + '</strong></div><div><small>Markets</small><strong>' + dev.markets + '</strong></div>' +
-    '<div><small>City upgrades</small><strong>' + dev.cityLevels + '</strong></div><div><small>Road-linked cities</small><strong>' + dev.roadLinkedCities + '</strong></div></div>' +
+    '<div><small>City upgrades</small><strong>' + dev.cityLevels + '</strong></div><div><small>Road-linked cities</small><strong>' + dev.roadLinkedCities + '</strong></div>' +
+    '<div><small>Residential zones</small><strong>' + dev.residentialZones + '</strong></div><div><small>Commercial zones</small><strong>' + dev.commercialZones + '</strong></div>' +
+    '<div><small>Industrial zones</small><strong>' + dev.industrialZones + '</strong></div><div><small>Housing capacity</small><strong>' + dev.housingCapacity.toLocaleString() + '</strong></div></div>' +
     meter('Territory', territoryCount(k.id), Math.max(1, tiles.length * 0.35), k.color) +
     meter('Treasury', k.treasury, 1000, '#d9b96f') + meter('Military', k.military, 800, '#d77874') +
     meter('Food stores', k.food, 500, '#9dc27d') + meter('Stability', k.stability, 100, '#91b66a') +
@@ -346,7 +390,7 @@ function renderAll() {
   $('kingdomStat').textContent = kingdoms.filter(k => k.alive).length;
   if ($('warStat')) $('warStat').textContent = diplomacy.wars.length;
   if ($('armyStat')) $('armyStat').textContent = armies.filter(a => a.troops > 0 && realm(a.owner) && realm(a.owner).alive).length;
-  if ($('developStat')) $('developStat').textContent = tiles.filter(t => t.road || t.building || (t.settlement && (Number(t.cityLevel) || 1) > 1)).length;
+  if ($('developStat')) $('developStat').textContent = tiles.filter(t => t.road || t.building || t.zone || (t.settlement && (Number(t.cityLevel) || 1) > 1)).length;
   $('yearStat').textContent = year; $('dateTag').textContent = 'YEAR ' + String(year).padStart(3, '0');
   $('runState').textContent = playing ? '● SIMULATING' : '● PAUSED';
   $('play').innerHTML = playing ? '<span>Ⅱ</span>Pause' : '<span>▶</span>Play';
@@ -691,8 +735,11 @@ function processEconomy(){
   const lands=territoryCount(k.id),settlements=settlementCount(k.id),partners=diplomacy.tradePacts.filter(t=>t.a===k.id||t.b===k.id).length;
   const dev=developmentStats(k.id);
   k.food=Math.max(0,Math.min(999,k.food+settlements*13+dev.farms*8+dev.markets*2+dev.cityLevels*2+lands*.28+partners*7-k.population/1000*4));
-  k.treasury=Math.max(0,k.treasury+partners*12+Math.floor(settlements*1.4+lands*.06)+dev.mines*5+dev.markets*8+Math.floor(dev.roads*.5)+dev.cityLevels*4);
+  k.treasury=Math.max(0,k.treasury+partners*12+Math.floor(settlements*1.4+lands*.06)+dev.mines*5+dev.markets*8+Math.floor(dev.roads*.5)+dev.cityLevels*4+dev.commercialOutput+dev.industrialOutput+Math.floor(dev.districtLevels*2));
   if(k.food<18){k.population=Math.max(200,Math.floor(k.population*.985));k.stability=Math.max(5,k.stability-3);k.food=12;if(rand()<.35)addEvent('Food shortages grip '+k.name+'. Population and stability suffer.');}
+  if(dev.industrialZones > dev.commercialZones + 2 && k.stability > 20 && rand() < .08) {
+   k.stability=Math.max(10,k.stability-1);
+  }
   if(k.stability<24&&!k.civilWar&&rand()<.10)launchCivilWar(k,'growing unrest and weak royal authority');
   if(k.tech<TECHS.length&&rand()<.075){k.tech++;addEvent(k.name+' advanced in '+TECHS[k.tech-2]+'. Technology is now level '+k.tech+'.');}
   if(k.stability<100&&rand()<.18)k.stability++;
@@ -726,6 +773,54 @@ function processDevelopmentAI(){
   }
   if(built&&rand()<.16)addEvent(k.name+' invested in city development: farms, roads, markets, or industry.');
  }
+}
+function processUrbanGrowth() {
+  for (const k of kingdoms) {
+    if (!k.alive) continue;
+    const cities = [], residential = [], commercial = [], industrial = [], upgradeable = [];
+    for (let i = 0; i < tiles.length; i++) {
+      const t = tiles[i];
+      if (t.owner !== k.id || t.terrain === 'water') continue;
+      if (t.settlement) cities.push(i);
+      if (t.zone === 'residential') residential.push(i);
+      if (t.zone === 'commercial') commercial.push(i);
+      if (t.zone === 'industrial') industrial.push(i);
+      if (t.zone && (Number(t.zoneLevel) || 1) < 3) upgradeable.push(i);
+    }
+    const buildable = [];
+    for (let i = 0; i < tiles.length; i++) {
+      const t = tiles[i];
+      if (t.owner !== k.id || t.terrain === 'water' || t.terrain === 'mountain' || t.settlement || t.building || t.zone) continue;
+      const x = i % w, y = Math.floor(i / w);
+      const nearCity = cities.some(ci => Math.abs(ci % w - x) + Math.abs(Math.floor(ci / w) - y) <= 2);
+      const nearRoad = neighbours(x, y).some(p => terrainAt(p[0], p[1]).road);
+      if (nearCity || nearRoad) buildable.push(i);
+    }
+    if (k.treasury >= 50 && upgradeable.length && rand() < 0.13) {
+      const i = upgradeable[Math.floor(rand() * upgradeable.length)], t = tiles[i];
+      const tier = Number(t.zoneLevel) || 1, cost = tier === 1 ? 50 : 100;
+      if (k.treasury >= cost) {
+        t.zoneLevel = tier + 1; k.treasury -= cost;
+        if (rand() < 0.12) addEvent(k.name + ' densified a ' + t.zone + ' district to level ' + t.zoneLevel + '.');
+        continue;
+      }
+    }
+    if (!buildable.length) continue;
+    let zone = null, cost = 0;
+    if (residential.length < Math.max(2, cities.length * 4) && k.food > 12 && k.treasury >= 15 && rand() < 0.32) {
+      zone = 'residential'; cost = 15;
+    } else if (commercial.length < Math.max(1, cities.length * 2) && k.treasury >= 25 && rand() < 0.22) {
+      zone = 'commercial'; cost = 25;
+    } else if (industrial.length < Math.max(1, cities.length * 2) && k.treasury >= 35 && k.treasury > 100 && rand() < 0.14) {
+      zone = 'industrial'; cost = 35;
+    }
+    if (!zone) continue;
+    const pool = buildable.filter(i => zone !== 'residential' || tiles[i].terrain === 'grass' || tiles[i].terrain === 'forest');
+    if (!pool.length) continue;
+    const t = tiles[pool[Math.floor(rand() * pool.length)]];
+    t.zone = zone; t.zoneLevel = 1; k.treasury -= cost;
+    if (rand() < 0.10) addEvent(k.name + ' zoned a new ' + zone + ' district near its growing towns.');
+  }
 }
 function launchCivilWar(k,cause){
  if(!k||!k.alive||k.civilWar)return false;
@@ -812,7 +907,7 @@ function simulateYear(){
  for(const k of kingdoms){
   if(!k.alive)continue;
   const dev=developmentStats(k.id);
-  const growth=Math.min(.045,1+rand()*.025-.004+dev.farms*.00012+dev.cityLevels*.00035+dev.roadLinkedCities*.00025);
+  const growth=Math.min(.045,1+rand()*.025-.004+dev.farms*.00012+dev.cityLevels*.00035+dev.roadLinkedCities*.00025+Math.min(.012,dev.housingCapacity/1000000));
   k.population=Math.max(200,Math.floor(k.population*growth));
   k.treasury=Math.max(0,k.treasury+Math.floor(k.population/1800+rand()*12-5));
   k.military=Math.max(50,Math.floor(k.military*(.98+rand()*.05)));
@@ -820,7 +915,7 @@ function simulateYear(){
   if(rand()<.74)expandRealm(k);
   if(rand()<.025){k.stability=Math.max(5,k.stability-Math.floor(rand()*10+3));addEvent('Unrest troubles '+k.name+'; stability falls to '+k.stability+'.');}
  }
- processDevelopmentAI();processArmies();processWars();processEconomy();processDynasties();processCivilWars();thinkPolitically();
+ processDevelopmentAI();processUrbanGrowth();processArmies();processWars();processEconomy();processDynasties();processCivilWars();thinkPolitically();
  if(year%5===0)addEvent('A five-year era begins. Trade, research, and borders continue to change.');
  if(year%10===0){const strongest=[...kingdoms].sort((a,b)=>territoryCount(b.id)-territoryCount(a.id))[0];addEvent(strongest.name+' controls the most territory in year '+year+'.');}
  renderAll();
@@ -853,6 +948,8 @@ function applyWorldState(s) {
     if (tile.rebel === undefined) tile.rebel = false;
     if (tile.road === undefined) tile.road = false;
     if (!['farm','mine','market'].includes(tile.building)) tile.building = null;
+    if (!['residential','commercial','industrial'].includes(tile.zone)) tile.zone = null;
+    tile.zoneLevel = tile.zone ? Math.max(1, Math.min(3, Math.floor(Number(tile.zoneLevel) || 1))) : 0;
     tile.cityLevel = tile.settlement ? Math.max(1, Math.min(3, Math.floor(Number(tile.cityLevel) || 1))) : 0;
   }
   const d = s.diplomacy || {};
@@ -897,10 +994,11 @@ canvas.addEventListener('click', e => {
     return;
   }
   if (tool === 'forest' || tool === 'mountain' || tool === 'water') {
-    t.terrain = tool; t.owner = -1; t.settlement = false; t.cityLevel = 0; t.fort = false; t.road = false; t.building = null;
+    t.terrain = tool; t.owner = -1; t.settlement = false; t.cityLevel = 0; t.fort = false; t.road = false; t.building = null; t.zone = null; t.zoneLevel = 0;
     addEvent('Terrain reshaped at coordinates ' + x + ', ' + y + '.');
   } else if (tool === 'village') {
     if (t.terrain === 'water') { addEvent('Settlements cannot be built on water.'); renderAll(); return; }
+    if (t.building || t.zone) { addEvent('Clear the existing development before founding a settlement here.'); renderAll(); return; }
     if (t.owner >= 0 && t.owner !== selected) { addEvent('Found new settlements only on ' + k.name + ' land or unclaimed land.'); renderAll(); return; }
     if (t.settlement) { addEvent('A settlement already exists at ' + x + ', ' + y + '.'); renderAll(); return; }
     if (t.owner === -1) t.owner = selected;
@@ -909,32 +1007,60 @@ canvas.addEventListener('click', e => {
     if (t.terrain === 'water') { addEvent('Land claims cannot be made over water.'); renderAll(); return; }
     const previous = t.owner; t.owner = selected;
     if (previous !== selected) addEvent(k.name + ' claimed a tile' + (previous >= 0 ? ' from ' + realm(previous).name : ' on the frontier') + '.');
-  } else if (['road','farm','mine','market','upgrade'].includes(tool)) {
+  } else if (['road','farm','mine','market','upgrade','residential','commercial','industrial'].includes(tool)) {
     if (t.owner !== selected) { addEvent('City development must be built on ' + k.name + ' territory. Select or claim a tile first.'); renderAll(); return; }
     if (tool === 'road') {
       if (t.terrain === 'water' || t.road) { addEvent(t.road ? 'A road already crosses this tile.' : 'Roads cannot cross water.'); renderAll(); return; }
       if (k.treasury < 10) { addEvent('Not enough treasury to build a road. Need 10 gold.'); renderAll(); return; }
       k.treasury -= 10; t.road = true; addEvent(k.name + ' built a road at ' + x + ', ' + y + ' for 10 gold.');
     } else if (tool === 'farm') {
-      if (t.terrain !== 'grass' || t.settlement || t.building) { addEvent('Farms need an empty grassland tile without a city or building.'); renderAll(); return; }
+      if (t.terrain !== 'grass' || t.settlement || t.building || t.zone) { addEvent('Farms need an empty grassland tile without a city or development.'); renderAll(); return; }
       if (k.treasury < 25) { addEvent('Not enough treasury to build a farm. Need 25 gold.'); renderAll(); return; }
       k.treasury -= 25; t.building = 'farm'; addEvent(k.name + ' opened a farm at ' + x + ', ' + y + '. Food output increases each year.');
     } else if (tool === 'mine') {
-      if ((t.terrain !== 'mountain' && t.resource !== 'ore') || t.settlement || t.building) { addEvent('Mines need an empty mountain or a tile marked with ore.'); renderAll(); return; }
+      if ((t.terrain !== 'mountain' && t.resource !== 'ore') || t.settlement || t.building || t.zone) { addEvent('Mines need an empty mountain or a tile marked with ore.'); renderAll(); return; }
       if (k.treasury < 40) { addEvent('Not enough treasury to build a mine. Need 40 gold.'); renderAll(); return; }
       k.treasury -= 40; t.building = 'mine'; addEvent(k.name + ' opened a mine at ' + x + ', ' + y + '. Industry increases annual treasury income.');
     } else if (tool === 'market') {
-      if (!t.settlement || t.building) { addEvent('Markets must be built on a settlement tile with an empty building slot.'); renderAll(); return; }
+      if (!t.settlement || t.building || t.zone) { addEvent('Markets must be built on a settlement tile with an empty building slot.'); renderAll(); return; }
       if (k.treasury < 60) { addEvent('Not enough treasury to build a market. Need 60 gold.'); renderAll(); return; }
       k.treasury -= 60; t.building = 'market'; addEvent(k.name + ' opened a market at ' + x + ', ' + y + '. Trade income and food stores increase.');
+    } else if (tool === 'upgrade') {
+      if (t.settlement) {
+        const tier = Math.max(1, Number(t.cityLevel) || 1);
+        if (tier >= 3) { addEvent('This city is already at the maximum level (3).'); renderAll(); return; }
+        const cost = tier === 1 ? 90 : 160;
+        if (k.treasury < cost) { addEvent('Not enough treasury to upgrade this city. Need ' + cost + ' gold.'); renderAll(); return; }
+        k.treasury -= cost; t.cityLevel = tier + 1;
+        addEvent(k.name + ' upgraded a settlement to city level ' + t.cityLevel + ' at ' + x + ', ' + y + '. Population growth and annual output improve.');
+      } else if (t.zone) {
+        const tier = Math.max(1, Number(t.zoneLevel) || 1);
+        if (tier >= 3) { addEvent('This district is already at the maximum level (3).'); renderAll(); return; }
+        const cost = tier === 1 ? 50 : 100;
+        if (k.treasury < cost) { addEvent('Not enough treasury to upgrade this district. Need ' + cost + ' gold.'); renderAll(); return; }
+        k.treasury -= cost; t.zoneLevel = tier + 1;
+        addEvent(k.name + ' upgraded its ' + t.zone + ' district to level ' + t.zoneLevel + ' at ' + x + ', ' + y + '.');
+      } else {
+        addEvent('Upgrade a settlement or zoned district, not empty land.'); renderAll(); return;
+      }
     } else {
-      if (!t.settlement) { addEvent('Upgrade a settlement or city tile, not empty land.'); renderAll(); return; }
-      const tier = Math.max(1, Number(t.cityLevel) || 1);
-      if (tier >= 3) { addEvent('This city is already at the maximum level (3).'); renderAll(); return; }
-      const cost = tier === 1 ? 90 : 160;
-      if (k.treasury < cost) { addEvent('Not enough treasury to upgrade this city. Need ' + cost + ' gold.'); renderAll(); return; }
-      k.treasury -= cost; t.cityLevel = tier + 1;
-      addEvent(k.name + ' upgraded a settlement to city level ' + t.cityLevel + ' at ' + x + ', ' + y + '. Population growth and annual output improve.');
+      const costs = { residential: 15, commercial: 25, industrial: 35 };
+      const names = { residential: 'residential', commercial: 'commercial', industrial: 'industrial' };
+      if (t.terrain === 'water' || t.settlement || t.building || t.zone) {
+        addEvent('Zones need an empty, non-water tile without another city or development.'); renderAll(); return;
+      }
+      if (tool === 'commercial' && !neighbours(x, y).some(p => {
+        const n = terrainAt(p[0], p[1]);
+        return n.settlement || n.road || n.zone === 'commercial';
+      })) {
+        addEvent('Commercial zones must connect to a settlement, road, or existing commercial district.'); renderAll(); return;
+      }
+      if (tool === 'industrial' && t.terrain === 'mountain' && t.resource !== 'ore') {
+        addEvent('Industrial zones need buildable land rather than a bare mountain.'); renderAll(); return;
+      }
+      if (k.treasury < costs[tool]) { addEvent('Not enough treasury to zone this tile. Need ' + costs[tool] + ' gold.'); renderAll(); return; }
+      k.treasury -= costs[tool]; t.zone = tool; t.zoneLevel = 1;
+      addEvent(k.name + ' designated a ' + names[tool] + ' district at ' + x + ', ' + y + '.');
     }
   }
   renderAll();
