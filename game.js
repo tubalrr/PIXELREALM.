@@ -3,6 +3,7 @@
 
 const canvas = document.getElementById('world');
 const ctx = canvas.getContext('2d');
+ctx.imageSmoothingEnabled = false;
 const $ = id => document.getElementById(id);
 const TILE = 16;
 const COLORS = ['#d9aa61', '#719ed1', '#d77874', '#91b66a', '#b38bce'];
@@ -137,89 +138,286 @@ function genWorld() {
   addEvent('Rulers gathered their councils. Every alliance, ambition, and border is yet to be written.');
   renderAll();
 }
+function hashTile(x, y, salt = 0) {
+  let n = Math.imul((x + 1) ^ salt, 374761393) + Math.imul((y + 7) ^ (salt * 13 + 1), 668265263);
+  n = Math.imul(n ^ (n >>> 13), 1274126177);
+  return ((n ^ (n >>> 16)) >>> 0) / 4294967296;
+}
+function drawPixelSprite(px, py, rows, palette, scale = 1) {
+  for (let y = 0; y < rows.length; y++) {
+    const row = rows[y];
+    let x = 0;
+    while (x < row.length) {
+      const ch = row[x];
+      if (ch === '.' || !palette[ch]) { x++; continue; }
+      let run = 1;
+      while (x + run < row.length && row[x + run] === ch) run++;
+      ctx.fillStyle = palette[ch];
+      ctx.fillRect(px + x * scale, py + y * scale, run * scale, scale);
+      x += run;
+    }
+  }
+}
+const SPRITES = {
+  tree: [
+    '...gg...',
+    '..gglg..',
+    '.ggglgg.',
+    'gggglggg',
+    '.ggglgg.',
+    '..gglg..',
+    '...dd...',
+    '...dd...',
+    '..bbbb..',
+    '..bbbb..'
+  ],
+  pine: [
+    '....g....',
+    '...ggg...',
+    '..gglgg..',
+    '.ggglggg.',
+    '..gglgg..',
+    '.gggglggg',
+    'ggggglggg',
+    '...ggg...',
+    '...ddd...',
+    '...ddd...'
+  ],
+  mountain: [
+    '..............',
+    '......ss......',
+    '.....swws.....',
+    '....swwwws....',
+    '...swwwwwws...',
+    '..swwwwwwwws..',
+    '.swwwwwwwddds.',
+    'swwwwwwdddddds',
+    'dddddddddddddd',
+    '..ddddd..ddddd',
+    '..rrrrr..rrrrr',
+    '.rrrrrr..rrrrrr',
+    'rrrrrrrrrrrrrr',
+    'rrrrrrrrrrrrrr'
+  ],
+  house: [
+    '....rr....',
+    '...rrrr...',
+    '..rrrrrr..',
+    '.rrrrrrrr.',
+    'rrrbbbbrrr',
+    '..wwwwww..',
+    '..wwyyww..',
+    '..wwyyww..',
+    '..wwyyww..',
+    '..wwyyww..',
+    '..wwwwww..'
+  ],
+  tallHouse: [
+    '....rr....',
+    '...rrrr...',
+    '..rrrrrr..',
+    '.rrrrrrrr.',
+    'rrrbbbbrrr',
+    '..wwwwww..',
+    '..wwyyww..',
+    '..wwwwww..',
+    '..wwyyww..',
+    '..wwyyww..',
+    '..wwdddd..',
+    '..wwdddd..',
+    '..wwwwww..'
+  ],
+  shop: [
+    '...tttt...',
+    '..tttttt..',
+    '.tttttttt.',
+    '..cccccc..',
+    '..wwwwww..',
+    '..wywyww..',
+    '..wwwwww..',
+    '..wwyyww..',
+    '..wwwwww..',
+    '..dddddd..'
+  ],
+  workshop: [
+    '....ii....',
+    '...iiii...',
+    '...i..i...',
+    '..iiiiii..',
+    '..bbbbbb..',
+    '.bbbbbbbb.',
+    '.bbbbbdbb.',
+    '.bbbbbdbb.',
+    '.bbbbbbbb.',
+    '..bbbbbb..',
+    '..dddddd..'
+  ],
+  mine: [
+    '.....ss.....',
+    '....srrs....',
+    '...srrrrs...',
+    '..srrrbrss..',
+    '.srrrbbbbrs.',
+    'ssbbbbbbbbss',
+    '..bbbyybb....',
+    '..bbbyybb....',
+    '..bbbbbbbb...',
+    '...bbbbbb....'
+  ],
+  farm: [
+    'gggggggggggg',
+    'ggbgggggbggg',
+    'ggbbbbbbbbgg',
+    'gggggggggggg',
+    'gbybybybybyg',
+    'gggggggggggg',
+    'gbybybybybyg',
+    'gggggggggggg',
+    'gbybybybybyg',
+    'gggggggggggg',
+    'gggggggggggg',
+    'gggggggggggg'
+  ]
+};
 function drawTile(t, x, y) {
   const px = x * TILE, py = y * TILE;
-  const base = showTerrain ? ({ water: '#254a55', grass: '#426744', forest: '#294f3b', mountain: '#636b5b' }[t.terrain] || '#426744') : '#44513b';
-  ctx.fillStyle = base; ctx.fillRect(px, py, TILE, TILE);
-  if (showTerrain && t.terrain === 'water') {
-    ctx.fillStyle = '#367080'; if ((x + y) % 3 === 0) ctx.fillRect(px + 4, py + 7, 6, 1); if ((x - y) % 5 === 0) ctx.fillRect(px + 9, py + 3, 3, 1);
-  } else if (showTerrain && t.terrain === 'grass') {
-    ctx.fillStyle = '#587c4b'; if ((x * 3 + y) % 5 === 0) ctx.fillRect(px + 3, py + 4, 2, 2); if ((x + y * 2) % 7 === 0) ctx.fillRect(px + 11, py + 11, 2, 2);
-  } else if (showTerrain && t.terrain === 'forest') {
-    ctx.fillStyle = '#182f27'; ctx.fillRect(px + 4, py + 3, 8, 8); ctx.fillRect(px + 2, py + 8, 12, 5); ctx.fillStyle = '#416e43'; ctx.fillRect(px + 6, py + 2, 4, 9);
-  } else if (showTerrain && t.terrain === 'mountain') {
-    ctx.fillStyle = '#9aa391'; ctx.fillRect(px + 2, py + 7, 12, 7); ctx.fillStyle = '#c0c6b4'; ctx.fillRect(px + 5, py + 3, 7, 6); ctx.fillStyle = '#737d70'; ctx.fillRect(px + 9, py + 9, 4, 4);
+  const palettes = {
+    grass: ['#47733f','#4c7b43','#56884a','#39653a','#7a9e50'],
+    forest: ['#244b36','#2b573a','#356641','#1b392d','#548148'],
+    mountain: ['#555f5a','#6c786f','#879287','#c2c9b8','#3c4846'],
+    water: ['#204c63','#286079','#347b91','#4d91a0','#173b53']
+  };
+  const colors = palettes[t.terrain] || palettes.grass;
+  ctx.fillStyle = colors[0]; ctx.fillRect(px, py, TILE, TILE);
+
+  if (t.terrain === 'water') {
+    ctx.fillStyle = colors[1];
+    ctx.fillRect(px, py + ((x * 3 + y) % 7), TILE, 2);
+    if (hashTile(x, y, 11) > 0.37) {
+      const rx = 2 + Math.floor(hashTile(x, y, 3) * 10);
+      const ry = 2 + Math.floor(hashTile(x, y, 5) * 11);
+      ctx.fillStyle = colors[2]; ctx.fillRect(px + rx, py + ry, 4, 1);
+      ctx.fillStyle = colors[3]; ctx.fillRect(px + rx + 1, py + ry - 1, 2, 1);
+    }
+    if ((x + y) % 5 === 0) {
+      ctx.fillStyle = colors[4]; ctx.fillRect(px + ((x * 5) % 11), py + 12, 2, 1);
+    }
+  } else if (t.terrain === 'grass') {
+    for (let i = 0; i < 7; i++) {
+      const n = hashTile(x, y, i + 2);
+      const gx = Math.floor(n * 14) + 1;
+      const gy = Math.floor(hashTile(x, y, i + 27) * 14) + 1;
+      ctx.fillStyle = colors[i % 5 === 0 ? 4 : i % 3 === 0 ? 3 : 1];
+      ctx.fillRect(px + gx, py + gy, i % 3 === 0 ? 2 : 1, 1);
+    }
+    if (hashTile(x, y, 81) > 0.86) {
+      const fx = 2 + Math.floor(hashTile(x, y, 82) * 11);
+      const fy = 2 + Math.floor(hashTile(x, y, 83) * 11);
+      ctx.fillStyle = '#e5d487'; ctx.fillRect(px + fx, py + fy, 1, 1);
+      ctx.fillStyle = '#f2e7b5'; ctx.fillRect(px + fx + 1, py + fy, 1, 1);
+    }
+  } else if (t.terrain === 'forest') {
+    ctx.fillStyle = colors[3]; ctx.fillRect(px, py + 12, TILE, 4);
+    drawPixelSprite(px + 1, py + 3, SPRITES.tree, { g: '#2f7044', l: '#5d9752', d: '#31573b', b: '#6a5237' }, 1);
+    drawPixelSprite(px + 8, py + 1, SPRITES.pine, { g: '#2b633e', l: '#5c8c4c', d: '#3d6441', b: '#72563a' }, 1);
+    if (hashTile(x, y, 14) > 0.42) {
+      ctx.fillStyle = '#477d49'; ctx.fillRect(px + 2, py + 2, 3, 2);
+      ctx.fillStyle = '#649a52'; ctx.fillRect(px + 3, py + 2, 2, 1);
+    }
+    ctx.fillStyle = '#9c885a'; ctx.fillRect(px + 4, py + 13, 1, 2);
+  } else if (t.terrain === 'mountain') {
+    ctx.fillStyle = '#475450'; ctx.fillRect(px, py + 12, TILE, 4);
+    drawPixelSprite(px + 1, py + 1, SPRITES.mountain, {
+      s: '#89958b', w: '#d0d6c5', d: '#646f68', r: '#47554f'
+    }, 1);
+    ctx.fillStyle = '#a8b5a0';
+    if (hashTile(x, y, 99) > 0.42) ctx.fillRect(px + 2, py + 13, 3, 1);
+    ctx.fillStyle = '#3a4541';
+    ctx.fillRect(px + 12, py + 12, 2, 2);
   }
+
+  // Sand pixels soften the edges where land touches a shore.
+  if (t.terrain !== 'water') {
+    const shore = '#b9aa72', shoreLight = '#d2c184';
+    if (y > 0 && terrainAt(x, y - 1).terrain === 'water') { ctx.fillStyle = shore; ctx.fillRect(px, py, TILE, 2); ctx.fillStyle = shoreLight; ctx.fillRect(px + ((x * 3) % 9), py, 3, 1); }
+    if (y < h - 1 && terrainAt(x, y + 1).terrain === 'water') { ctx.fillStyle = shore; ctx.fillRect(px, py + TILE - 2, TILE, 2); ctx.fillStyle = shoreLight; ctx.fillRect(px + ((x * 5) % 10), py + TILE - 1, 2, 1); }
+    if (x > 0 && terrainAt(x - 1, y).terrain === 'water') { ctx.fillStyle = shore; ctx.fillRect(px, py, 2, TILE); ctx.fillStyle = shoreLight; ctx.fillRect(px, py + ((y * 3) % 10), 1, 3); }
+    if (x < w - 1 && terrainAt(x + 1, y).terrain === 'water') { ctx.fillStyle = shore; ctx.fillRect(px + TILE - 2, py, 2, TILE); ctx.fillStyle = shoreLight; ctx.fillRect(px + TILE - 1, py + ((y * 5) % 10), 1, 3); }
+  }
+
   if (showTerritory && t.owner >= 0) {
-    ctx.fillStyle = COLORS[t.owner] + '48'; ctx.fillRect(px, py, TILE, TILE);
+    ctx.fillStyle = COLORS[t.owner] + '30'; ctx.fillRect(px, py, TILE, TILE);
     ctx.fillStyle = COLORS[t.owner];
     if (x === 0 || terrainAt(x - 1, y).owner !== t.owner) ctx.fillRect(px, py, 1, TILE);
     if (x === w - 1 || terrainAt(x + 1, y).owner !== t.owner) ctx.fillRect(px + TILE - 1, py, 1, TILE);
     if (y === 0 || terrainAt(x, y - 1).owner !== t.owner) ctx.fillRect(px, py, TILE, 1);
     if (y === h - 1 || terrainAt(x, y + 1).owner !== t.owner) ctx.fillRect(px, py + TILE - 1, TILE, 1);
   }
-  if (t.rebel) { ctx.fillStyle = '#b83440aa'; ctx.fillRect(px, py, TILE, TILE); ctx.strokeStyle = '#ff8b8b'; ctx.lineWidth = 1; ctx.strokeRect(px + 1, py + 1, TILE - 2, TILE - 2); ctx.fillStyle = '#ffd0c6'; ctx.fillRect(px + 4, py + 4, 8, 2); ctx.fillRect(px + 7, py + 4, 2, 8); }
-  if (t.owner >= 0 && t.settlement) {
-    ctx.fillStyle = '#1b201b'; ctx.fillRect(px + 3, py + 5, 10, 8); ctx.fillStyle = '#d8c59a'; ctx.fillRect(px + 4, py + 6, 8, 6); ctx.fillStyle = '#8e4942'; ctx.fillRect(px + 3, py + 4, 10, 3); ctx.fillStyle = '#e7d6a5'; ctx.fillRect(px + 7, py + 8, 2, 4);
+
+  if (t.rebel) {
+    ctx.fillStyle = '#973b43a8'; ctx.fillRect(px, py, TILE, TILE);
+    ctx.fillStyle = '#ffd0c6'; ctx.fillRect(px + 4, py + 4, 8, 2); ctx.fillRect(px + 7, py + 4, 2, 8);
+    ctx.fillStyle = '#321f24'; ctx.fillRect(px + 3, py + 3, 1, 10); ctx.fillRect(px + 12, py + 3, 1, 10);
   }
+
   if (t.road && t.terrain !== 'water') {
-    ctx.fillStyle = '#b8a174'; ctx.fillRect(px + 1, py + 7, TILE - 2, 2);
+    ctx.fillStyle = '#79664a'; ctx.fillRect(px, py + 7, TILE, 4);
+    ctx.fillStyle = '#c8ad78'; ctx.fillRect(px, py + 7, TILE, 2);
+    if ((x + y) % 2 === 0) { ctx.fillStyle = '#9d845b'; ctx.fillRect(px + 2, py + 10, 3, 1); }
     const north = y > 0 && terrainAt(x, y - 1).road;
     const south = y < h - 1 && terrainAt(x, y + 1).road;
-    if (north || south) ctx.fillRect(px + 7, py + 1, 2, TILE - 2);
-    ctx.fillStyle = '#d7c18d'; ctx.fillRect(px + 6, py + 7, 2, 2);
+    if (north || south) { ctx.fillStyle = '#c8ad78'; ctx.fillRect(px + 7, py, 2, TILE); ctx.fillStyle = '#79664a'; ctx.fillRect(px + 9, py, 1, TILE); }
   }
+
   if (t.owner >= 0 && t.fort) {
-    ctx.fillStyle = '#332e29'; ctx.fillRect(px + 5, py + 2, 7, 5); ctx.fillStyle = '#dad3b5'; ctx.fillRect(px + 6, py + 3, 5, 4); ctx.fillStyle = '#887d64'; ctx.fillRect(px + 5, py + 2, 7, 1);
+    ctx.fillStyle = '#3a3129'; ctx.fillRect(px + 2, py + 7, 12, 7);
+    ctx.fillStyle = '#b9b69a'; ctx.fillRect(px + 3, py + 6, 10, 7);
+    ctx.fillStyle = '#7f8a79'; ctx.fillRect(px + 3, py + 5, 2, 3); ctx.fillRect(px + 7, py + 5, 2, 3); ctx.fillRect(px + 11, py + 5, 2, 3);
+    ctx.fillStyle = '#3d493d'; ctx.fillRect(px + 5, py + 9, 6, 4);
+    ctx.fillStyle = '#e4c579'; ctx.fillRect(px + 7, py + 10, 2, 3);
   }
-  if (t.settlement) {
+
+  if (t.owner >= 0 && t.settlement) {
     const tier = Math.max(1, Math.min(3, Number(t.cityLevel) || 1));
-    ctx.fillStyle = '#e4c579';
-    for (let level = 0; level < tier; level++) ctx.fillRect(px + 2 + level * 3, py + 13, 2, 2);
-    if (tier >= 2) {
-      ctx.fillStyle = '#d8c59a'; ctx.fillRect(px + 10, py + 3, 4, 5);
-      ctx.fillStyle = '#8e4942'; ctx.fillRect(px + 9, py + 2, 6, 2);
-      ctx.fillStyle = '#f0dfb2'; ctx.fillRect(px + 11, py + 5, 1, 2);
-    }
-    if (tier >= 3) {
-      ctx.fillStyle = '#dbc89b'; ctx.fillRect(px + 2, py + 1, 4, 7);
-      ctx.fillStyle = '#b96d56'; ctx.fillRect(px + 1, py, 6, 2);
-      ctx.fillStyle = '#f0dfb2'; ctx.fillRect(px + 3, py + 3, 1, 2);
+    const housePalette = { r: '#7d3e39', b: '#332a25', w: '#d5c49a', y: '#7d6144', d: '#72553b' };
+    if (tier === 1) drawPixelSprite(px + 3, py + 4, SPRITES.house, housePalette, 1);
+    else if (tier === 2) {
+      drawPixelSprite(px + 2, py + 5, SPRITES.house, housePalette, 1);
+      drawPixelSprite(px + 7, py + 1, SPRITES.tallHouse, { ...housePalette, r: '#b9654b', w: '#e0d2ac' }, 1);
+    } else {
+      drawPixelSprite(px + 1, py + 5, SPRITES.house, housePalette, 1);
+      drawPixelSprite(px + 7, py + 4, SPRITES.house, { ...housePalette, r: '#a85143' }, 1);
+      ctx.fillStyle = '#d7c69f'; ctx.fillRect(px + 8, py, 5, 6);
+      ctx.fillStyle = '#c9b57f'; ctx.fillRect(px + 7, py - 1, 7, 2);
+      ctx.fillStyle = '#8e4942'; ctx.fillRect(px + 9, py + 2, 1, 2);
     }
   }
+
   if (t.building === 'farm') {
-    ctx.fillStyle = '#b4c47c'; ctx.fillRect(px + 3, py + 3, 10, 8);
-    ctx.fillStyle = '#5f8548'; ctx.fillRect(px + 4, py + 4, 8, 1); ctx.fillRect(px + 4, py + 7, 8, 1); ctx.fillRect(px + 4, py + 10, 8, 1);
+    drawPixelSprite(px + 2, py + 2, SPRITES.farm, { g: '#678e43', b: '#456433', y: '#d0c16f' }, 1);
+    ctx.fillStyle = '#b8cc75'; ctx.fillRect(px + 3, py + 4, 1, 6);
   } else if (t.building === 'mine') {
-    ctx.fillStyle = '#313c37'; ctx.fillRect(px + 3, py + 5, 10, 8);
-    ctx.fillStyle = '#a8b1a5'; ctx.fillRect(px + 5, py + 4, 6, 2); ctx.fillRect(px + 7, py + 3, 2, 4);
-    ctx.fillStyle = '#e4c579'; ctx.fillRect(px + 8, py + 8, 3, 2);
+    drawPixelSprite(px + 2, py + 3, SPRITES.mine, { s: '#9da99b', r: '#707f76', b: '#293735', y: '#d6bb67' }, 1);
   } else if (t.building === 'market') {
-    ctx.fillStyle = '#d9c79a'; ctx.fillRect(px + 4, py + 7, 8, 6);
-    ctx.fillStyle = '#b96d56'; ctx.fillRect(px + 3, py + 4, 10, 3);
-    ctx.fillStyle = '#f0dfb2'; ctx.fillRect(px + 5, py + 5, 2, 2); ctx.fillRect(px + 9, py + 5, 2, 2);
+    drawPixelSprite(px + 3, py + 3, SPRITES.shop, { t: '#b24e47', c: '#d5bd8a', w: '#e9dbb4', y: '#76583d', d: '#463b2f' }, 1);
   }
+
   if (t.zone && t.owner >= 0) {
     const level = Math.max(1, Math.min(3, Number(t.zoneLevel) || 1));
     if (t.zone === 'residential') {
-      ctx.fillStyle = '#d5c39a'; ctx.fillRect(px + 2, py + 7, 5, 6);
-      ctx.fillStyle = '#b86d58'; ctx.fillRect(px + 1, py + 5, 7, 3);
-      if (level >= 2) { ctx.fillStyle = '#e1d3ad'; ctx.fillRect(px + 9, py + 5, 5, 8); ctx.fillStyle = '#a95449'; ctx.fillRect(px + 8, py + 3, 7, 3); }
-      if (level >= 3) { ctx.fillStyle = '#d4c49f'; ctx.fillRect(px + 5, py + 1, 5, 5); ctx.fillStyle = '#cfb977'; ctx.fillRect(px + 4, py, 7, 2); }
+      drawPixelSprite(px + 3, py + 4, SPRITES.house, { r: '#8a4840', b: '#392e27', w: '#e1cfaa', y: '#7c6045', d: '#5b4736' }, 1);
+      if (level >= 2) drawPixelSprite(px + 7, py + 1, SPRITES.tallHouse, { r: '#b9634e', b: '#392e27', w: '#e6d5b0', y: '#7c6045', d: '#5b4736' }, 1);
+      if (level >= 3) { ctx.fillStyle = '#d2c29e'; ctx.fillRect(px + 1, py + 1, 3, 7); ctx.fillStyle = '#c2aa72'; ctx.fillRect(px + 1, py, 4, 2); ctx.fillStyle = '#e5d6ad'; ctx.fillRect(px + 2, py + 3, 1, 2); }
     } else if (t.zone === 'commercial') {
-      ctx.fillStyle = '#e0c98f'; ctx.fillRect(px + 3, py + 6, 10, 7);
-      ctx.fillStyle = '#ad6752'; ctx.fillRect(px + 2, py + 4, 12, 3);
-      ctx.fillStyle = '#f5e6bc'; ctx.fillRect(px + 4, py + 8, 2, 3); ctx.fillRect(px + 8, py + 8, 3, 2);
-      if (level >= 2) { ctx.fillStyle = '#d7c6a0'; ctx.fillRect(px + 9, py + 1, 5, 5); ctx.fillStyle = '#e4c579'; ctx.fillRect(px + 8, py, 7, 2); }
-      if (level >= 3) { ctx.fillStyle = '#f0dfb2'; ctx.fillRect(px + 5, py + 2, 2, 2); }
+      drawPixelSprite(px + 3, py + 4, SPRITES.shop, { t: '#b24e47', c: '#d8c391', w: '#f0e1b5', y: '#876b49', d: '#463b2f' }, 1);
+      if (level >= 2) { ctx.fillStyle = '#e4c579'; ctx.fillRect(px + 10, py + 2, 4, 2); ctx.fillStyle = '#d4c39a'; ctx.fillRect(px + 10, py + 4, 4, 7); ctx.fillStyle = '#473b2f'; ctx.fillRect(px + 11, py + 7, 1, 3); }
+      if (level >= 3) { ctx.fillStyle = '#d6c39a'; ctx.fillRect(px + 1, py + 2, 4, 10); ctx.fillStyle = '#986348'; ctx.fillRect(px + 1, py + 1, 4, 2); ctx.fillStyle = '#f0dfb2'; ctx.fillRect(px + 2, py + 4, 1, 2); }
     } else if (t.zone === 'industrial') {
-      ctx.fillStyle = '#7c8b7f'; ctx.fillRect(px + 2, py + 7, 12, 6);
-      ctx.fillStyle = '#505e56'; ctx.fillRect(px + 4, py + 4, 5, 4); ctx.fillRect(px + 10, py + 2, 3, 6);
-      ctx.fillStyle = '#c7c8b4'; ctx.fillRect(px + 10, py + 1, 3, 2);
-      if (level >= 2) { ctx.fillStyle = '#9ba79b'; ctx.fillRect(px + 1, py + 5, 3, 4); ctx.fillStyle = '#d8dccf'; ctx.fillRect(px + 1, py + 3, 3, 2); }
-      if (level >= 3) { ctx.fillStyle = '#727f76'; ctx.fillRect(px + 7, py + 2, 2, 5); ctx.fillStyle = '#ced3c8'; ctx.fillRect(px + 6, py + 1, 4, 2); }
+      drawPixelSprite(px + 2, py + 4, SPRITES.workshop, { i: '#b8bfb0', b: '#555f58', r: '#3d4a43', s: '#76877a', y: '#d4c28a', d: '#2c3934' }, 1);
+      if (level >= 2) { ctx.fillStyle = '#8d9a8e'; ctx.fillRect(px + 1, py + 4, 3, 7); ctx.fillStyle = '#d2d7c8'; ctx.fillRect(px + 1, py + 2, 3, 2); }
+      if (level >= 3) { ctx.fillStyle = '#aeb8aa'; ctx.fillRect(px + 10, py + 1, 3, 5); ctx.fillStyle = '#d3d9ca'; ctx.fillRect(px + 9, py, 4, 2); }
     }
-    ctx.fillStyle = '#f5e6bd';
+    ctx.fillStyle = '#f0dd9a';
     for (let levelIndex = 0; levelIndex < level; levelIndex++) ctx.fillRect(px + 2 + levelIndex * 4, py + 14, 2, 1);
   }
 }
