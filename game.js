@@ -264,6 +264,22 @@ const SPRITES = {
     '..bbbbbbbb...',
     '...bbbbbb....'
   ],
+  soldier: [
+    '.....pp.....',
+    '....phhp....',
+    '....phhp....',
+    '.....pp.....',
+    '...bbbbbb...',
+    '..bssssssb..',
+    '..bssssssb..',
+    '...bssgsb...',
+    '...bssgsb...',
+    '....bbbb....',
+    '....b..b....',
+    '....b..b....',
+    '...bb..bb...',
+    '..bb....bb..'
+  ],
   farm: [
     'gggggggggggg',
     'ggbgggggbggg',
@@ -288,9 +304,9 @@ function drawTile(t, x, y) {
     water: ['#204c63','#286079','#347b91','#4d91a0','#173b53']
   };
   const colors = palettes[t.terrain] || palettes.grass;
-  ctx.fillStyle = colors[0]; ctx.fillRect(px, py, TILE, TILE);
+  ctx.fillStyle = showTerrain ? colors[0] : '#44513b'; ctx.fillRect(px, py, TILE, TILE);
 
-  if (t.terrain === 'water') {
+  if (showTerrain && t.terrain === 'water') {
     ctx.fillStyle = colors[1];
     ctx.fillRect(px, py + ((x * 3 + y) % 7), TILE, 2);
     if (hashTile(x, y, 11) > 0.37) {
@@ -302,7 +318,7 @@ function drawTile(t, x, y) {
     if ((x + y) % 5 === 0) {
       ctx.fillStyle = colors[4]; ctx.fillRect(px + ((x * 5) % 11), py + 12, 2, 1);
     }
-  } else if (t.terrain === 'grass') {
+  } else if (showTerrain && t.terrain === 'grass') {
     for (let i = 0; i < 7; i++) {
       const n = hashTile(x, y, i + 2);
       const gx = Math.floor(n * 14) + 1;
@@ -316,7 +332,7 @@ function drawTile(t, x, y) {
       ctx.fillStyle = '#e5d487'; ctx.fillRect(px + fx, py + fy, 1, 1);
       ctx.fillStyle = '#f2e7b5'; ctx.fillRect(px + fx + 1, py + fy, 1, 1);
     }
-  } else if (t.terrain === 'forest') {
+  } else if (showTerrain && t.terrain === 'forest') {
     ctx.fillStyle = colors[3]; ctx.fillRect(px, py + 12, TILE, 4);
     drawPixelSprite(px + 1, py + 3, SPRITES.tree, { g: '#2f7044', l: '#5d9752', d: '#31573b', b: '#6a5237' }, 1);
     drawPixelSprite(px + 8, py + 1, SPRITES.pine, { g: '#2b633e', l: '#5c8c4c', d: '#3d6441', b: '#72563a' }, 1);
@@ -325,7 +341,7 @@ function drawTile(t, x, y) {
       ctx.fillStyle = '#649a52'; ctx.fillRect(px + 3, py + 2, 2, 1);
     }
     ctx.fillStyle = '#9c885a'; ctx.fillRect(px + 4, py + 13, 1, 2);
-  } else if (t.terrain === 'mountain') {
+  } else if (showTerrain && t.terrain === 'mountain') {
     ctx.fillStyle = '#475450'; ctx.fillRect(px, py + 12, TILE, 4);
     drawPixelSprite(px + 1, py + 1, SPRITES.mountain, {
       s: '#89958b', w: '#d0d6c5', d: '#646f68', r: '#47554f'
@@ -337,7 +353,7 @@ function drawTile(t, x, y) {
   }
 
   // Sand pixels soften the edges where land touches a shore.
-  if (t.terrain !== 'water') {
+  if (showTerrain && t.terrain !== 'water') {
     const shore = '#b9aa72', shoreLight = '#d2c184';
     if (y > 0 && terrainAt(x, y - 1).terrain === 'water') { ctx.fillStyle = shore; ctx.fillRect(px, py, TILE, 2); ctx.fillStyle = shoreLight; ctx.fillRect(px + ((x * 3) % 9), py, 3, 1); }
     if (y < h - 1 && terrainAt(x, y + 1).terrain === 'water') { ctx.fillStyle = shore; ctx.fillRect(px, py + TILE - 2, TILE, 2); ctx.fillStyle = shoreLight; ctx.fillRect(px + ((x * 5) % 10), py + TILE - 1, 2, 1); }
@@ -448,11 +464,20 @@ function renderMap() {
   armies.forEach(a => {
     if (a.troops <= 0 || !realm(a.owner).alive) return;
     const px = a.x * TILE, py = a.y * TILE;
-    ctx.fillStyle = '#101510'; ctx.fillRect(px + 3, py + 5, 10, 9);
-    ctx.fillStyle = COLORS[a.owner]; ctx.fillRect(px + 5, py + 7, 6, 6);
-    ctx.fillStyle = '#ece9d1'; ctx.fillRect(px + 6, py + 8, 4, 4);
-    ctx.fillStyle = COLORS[a.owner]; ctx.fillRect(px + 10, py + 2, 1, 7); ctx.fillRect(px + 11, py + 2, 4, 3);
-    if (a.id === selectedArmyId) { ctx.strokeStyle = '#f1d48b'; ctx.lineWidth = 1; ctx.strokeRect(px + 1, py + 1, TILE - 2, TILE - 2); }
+    ctx.fillStyle = '#121711'; ctx.fillRect(px + 2, py + 2, 12, 13);
+    // Tiny soldier: helmet, realm-colored tunic, shield, boots and banner.
+    drawPixelSprite(px + 2, py + 1, SPRITES.soldier, {
+      p: '#d9c89a', h: '#f2e3bc', b: '#252d28',
+      s: COLORS[a.owner], g: '#e4c579'
+    }, 1);
+    ctx.fillStyle = '#d7c9a0'; ctx.fillRect(px + 12, py + 1, 1, 8);
+    ctx.fillStyle = COLORS[a.owner]; ctx.fillRect(px + 13, py + 2, 3, 3);
+    ctx.fillStyle = '#e4c579'; ctx.fillRect(px + 13, py + 2, 1, 1);
+    if (a.id === selectedArmyId) {
+      ctx.strokeStyle = '#f1d48b'; ctx.lineWidth = 1;
+      ctx.strokeRect(px + 1, py + 1, TILE - 2, TILE - 2);
+      ctx.fillStyle = '#f1d48b'; ctx.fillRect(px + 1, py + 1, 3, 1); ctx.fillRect(px + 12, py + 14, 3, 1);
+    }
   });
 }
 function renderKingdoms() {
