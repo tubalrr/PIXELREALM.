@@ -17,6 +17,7 @@ let showTerritory = true, showTerrain = true, showEvents = true, tool = 'inspect
 let selected = 0, opponent = 1, events = [], timer = null, seed = 1;
 let diplomacy = { wars: [], alliances: [], tradePacts: [] };
 let armies = [], nextArmyId = 1, selectedArmyId = null;
+let visualFrame = 0, visualLastTimestamp = 0, villagers = [], nextVillagerId = 1;
 
 function rand() { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; }
 function idx(x, y) { return y * w + x; }
@@ -136,6 +137,7 @@ function genWorld() {
   diplomacy = { wars: [], alliances: [], tradePacts: [] };
   addEvent('Five realms rose across an untamed world. The age of kingdoms begins.');
   addEvent('Rulers gathered their councils. Every alliance, ambition, and border is yet to be written.');
+  villagers = []; nextVillagerId = 1; syncVillagers();
   renderAll();
 }
 function hashTile(x, y, salt = 0) {
@@ -280,6 +282,34 @@ const SPRITES = {
     '...bb..bb...',
     '..bb....bb..'
   ],
+  villagerA: [
+    '...hh...',
+    '..hhhh..',
+    '..hphh..',
+    '..ssss..',
+    '..ssss..',
+    '...ss...',
+    '..ssyy..',
+    '..ssyy..',
+    '...ss...',
+    '...bb...',
+    '..b..b..',
+    '..b..b..'
+  ],
+  villagerB: [
+    '...hh...',
+    '..hhhh..',
+    '..hphh..',
+    '..ssss..',
+    '..ssss..',
+    '...ss...',
+    '..ssyy..',
+    '..ssyy..',
+    '...ss...',
+    '..b..b..',
+    '...bb...',
+    '..b..b..'
+  ],
   farm: [
     'gggggggggggg',
     'ggbgggggbggg',
@@ -295,6 +325,101 @@ const SPRITES = {
     'gggggggggggg'
   ]
 };
+function syncVillagers() {
+  const homes = new Map();
+  for (let i = 0; i < tiles.length; i++) {
+    const t = tiles[i];
+    if (t.settlement && t.owner >= 0 && realm(t.owner) && realm(t.owner).alive) homes.set(i, t.owner);
+  }
+  villagers = villagers.filter(v => homes.has(v.homeIndex) && homes.get(v.homeIndex) === v.owner);
+  for (const [homeIndex, owner] of homes) {
+    const home = tiles[homeIndex], hx = homeIndex % w, hy = Math.floor(homeIndex / w);
+    const existing = villagers.filter(v => v.homeIndex === homeIndex);
+    let nearbyResidential = false;
+    for (let dy = -2; dy <= 2 && !nearbyResidential; dy++) for (let dx = -2; dx <= 2; dx++) {
+      const x = hx + dx, y = hy + dy;
+      if (!inBounds(x,y) || Math.abs(dx) + Math.abs(dy) > 2) continue;
+      const t = terrainAt(x,y);
+      if (t.owner === owner && t.zone === 'residential') { nearbyResidential = true; break; }
+    }
+    const desired = Math.min(3, 1 + ((Number(home.cityLevel) || 1) >= 2 ? 1 : 0) + (nearbyResidential ? 1 : 0));
+    while (existing.length < desired) {
+      const n = existing.length;
+      const sx = hx + (n % 2 ? 0.65 : 0.25), sy = hy + (n % 2 ? 0.58 : 0.38);
+      const v = { id: nextVillagerId++, owner, homeIndex, x: sx, y: sy, targetX: sx, targetY: sy,
+        walkPhase: n * 2, pause: 2 + n * 3, facing: 1 };
+      villagers.push(v); existing.push(v);
+    }
+    if (existing.length > desired) {
+      const remove = new Set(existing.slice(desired).map(v => v.id));
+      villagers = villagers.filter(v => !remove.has(v.id));
+    }
+  }
+}
+function chooseVillagerTarget(v) {
+  const cx = Math.max(0, Math.min(w - 1, Math.floor(v.x)));
+  const cy = Math.max(0, Math.min(h - 1, Math.floor(v.y)));
+  const hx = v.homeIndex % w, hy = Math.floor(v.homeIndex / w);
+  const options = neighbours(cx, cy).filter(([x,y]) => {
+    const t = terrainAt(x,y);
+    return t.terrain !== 'water' && (t.owner === v.owner || t.owner === -1) &&
+      Math.abs(x - hx) + Math.abs(y - hy) <= 3;
+  });
+  if (!options.length) { v.targetX = hx + 0.5; v.targetY = hy + 0.55; return; }
+  options.sort((a,b) => {
+    const score = p => {
+      const t = terrainAt(p[0],p[1]);
+      return (t.road ? 3 : 0) + (t.settlement ? 2 : 0) +
+        (t.zone === 'residential' || t.zone === 'commercial' ? 1 : 0) + Math.random() * 0.35;
+    };
+    return score(b) - score(a);
+  });
+  const [tx,ty] = options[Math.floor(Math.random() * Math.min(options.length, 3))];
+  v.targetX = tx + 0.25 + Math.random() * 0.5;
+  v.targetY = ty + 0.25 + Math.random() * 0.5;
+}
+function updateVillagers() {
+  syncVillagers();
+  for (const v of villagers) {
+    if (v.pause > 0) { v.pause--; v.walkPhase = 0; continue; }
+    const dx = v.targetX - v.x, dy = v.targetY - v.y;
+    const distance = Math.hypot(dx,dy);
+    if (distance < 0.045) {
+      v.pause = 2 + Math.floor(Math.random() * 8);
+      chooseVillagerTarget(v);
+      v.walkPhase = 0;
+      continue;
+    }
+    const speed = 0.055;
+    v.x += dx / distance * Math.min(speed,distance);
+    v.y += dy / distance * Math.min(speed,distance);
+    if (Math.abs(dx) > 0.02) v.facing = dx < 0 ? -1 : 1;
+    v.walkPhase++;
+  }
+}
+function drawVillagers() {
+  for (const v of villagers) {
+    if (!inBounds(Math.floor(v.x), Math.floor(v.y))) continue;
+    const px = Math.round(v.x * TILE), py = Math.round(v.y * TILE);
+    const walking = v.walkPhase > 0 && visualFrame % 4 < 2;
+    const sprite = walking ? SPRITES.villagerB : SPRITES.villagerA;
+    const palette = { h: '#d6ba8b', p: '#554233', s: COLORS[v.owner], y: '#d4be84', b: '#3b3329' };
+    ctx.fillStyle = '#182018'; ctx.fillRect(px + 3, py + 11, 3, 1);
+    if (v.facing < 0) {
+      ctx.save(); ctx.translate(px + 8, py + 1); ctx.scale(-1, 1);
+      drawPixelSprite(0, 0, sprite, palette, 1); ctx.restore();
+    } else drawPixelSprite(px + 4, py + 1, sprite, palette, 1);
+  }
+}
+function animateVisuals(timestamp) {
+  if (timestamp - visualLastTimestamp >= 125) {
+    visualLastTimestamp = timestamp;
+    visualFrame = (visualFrame + 1) % 16;
+    updateVillagers();
+    renderMap();
+  }
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(animateVisuals);
+}
 function drawTile(t, x, y) {
   const px = x * TILE, py = y * TILE;
   const palettes = {
@@ -307,16 +432,18 @@ function drawTile(t, x, y) {
   ctx.fillStyle = showTerrain ? colors[0] : '#44513b'; ctx.fillRect(px, py, TILE, TILE);
 
   if (showTerrain && t.terrain === 'water') {
+    const flow = visualFrame % 8;
     ctx.fillStyle = colors[1];
     ctx.fillRect(px, py + ((x * 3 + y) % 7), TILE, 2);
-    if (hashTile(x, y, 11) > 0.37) {
-      const rx = 2 + Math.floor(hashTile(x, y, 3) * 10);
+    if (hashTile(x, y, 11) > 0.24) {
+      const rx = (2 + Math.floor(hashTile(x, y, 3) * 10) + flow * 2) % 13;
       const ry = 2 + Math.floor(hashTile(x, y, 5) * 11);
-      ctx.fillStyle = colors[2]; ctx.fillRect(px + rx, py + ry, 4, 1);
-      ctx.fillStyle = colors[3]; ctx.fillRect(px + rx + 1, py + ry - 1, 2, 1);
+      ctx.fillStyle = colors[2]; ctx.fillRect(px + rx, py + ry, 3, 1);
+      ctx.fillStyle = colors[3]; ctx.fillRect(px + ((rx + 1) % 15), py + Math.max(1, ry - 1), 2, 1);
+      if (flow % 3 === 0) { ctx.fillStyle = '#9ac3c0'; ctx.fillRect(px + ((rx + 5) % 15), py + ((ry + 6) % 15), 1, 1); }
     }
-    if ((x + y) % 5 === 0) {
-      ctx.fillStyle = colors[4]; ctx.fillRect(px + ((x * 5) % 11), py + 12, 2, 1);
+    if ((x + y + flow) % 5 === 0) {
+      ctx.fillStyle = colors[4]; ctx.fillRect(px + ((x * 5 + flow * 2) % 14), py + 12, 2, 1);
     }
   } else if (showTerrain && t.terrain === 'grass') {
     for (let i = 0; i < 7; i++) {
@@ -339,6 +466,9 @@ function drawTile(t, x, y) {
     if (hashTile(x, y, 14) > 0.42) {
       ctx.fillStyle = '#477d49'; ctx.fillRect(px + 2, py + 2, 3, 2);
       ctx.fillStyle = '#649a52'; ctx.fillRect(px + 3, py + 2, 2, 1);
+    }
+    if (visualFrame % 7 === 0 && hashTile(x, y, 67) > 0.45) {
+      ctx.fillStyle = '#8fbc65'; ctx.fillRect(px + 5 + Math.floor(hashTile(x, y, 68) * 7), py + 3 + Math.floor(hashTile(x, y, 69) * 7), 1, 1);
     }
     ctx.fillStyle = '#9c885a'; ctx.fillRect(px + 4, py + 13, 1, 2);
   } else if (showTerrain && t.terrain === 'mountain') {
@@ -461,18 +591,19 @@ function renderMap() {
     ctx.fillStyle = '#f4e6bd'; ctx.fillRect(k.x * TILE + 5, k.y * TILE + 3, 6, 6);
     ctx.fillStyle = k.color; ctx.fillRect(k.x * TILE + 6, k.y * TILE + 4, 4, 4);
   });
+  drawVillagers();
   armies.forEach(a => {
     if (a.troops <= 0 || !realm(a.owner).alive) return;
     const px = a.x * TILE, py = a.y * TILE;
+    const bob = visualFrame % 6 < 3 ? 0 : -1;
     ctx.fillStyle = '#121711'; ctx.fillRect(px + 2, py + 2, 12, 13);
-    // Tiny soldier: helmet, realm-colored tunic, shield, boots and banner.
-    drawPixelSprite(px + 2, py + 1, SPRITES.soldier, {
+    drawPixelSprite(px + 2, py + 1 + bob, SPRITES.soldier, {
       p: '#d9c89a', h: '#f2e3bc', b: '#252d28',
       s: COLORS[a.owner], g: '#e4c579'
     }, 1);
-    ctx.fillStyle = '#d7c9a0'; ctx.fillRect(px + 12, py + 1, 1, 8);
-    ctx.fillStyle = COLORS[a.owner]; ctx.fillRect(px + 13, py + 2, 3, 3);
-    ctx.fillStyle = '#e4c579'; ctx.fillRect(px + 13, py + 2, 1, 1);
+    ctx.fillStyle = '#d7c9a0'; ctx.fillRect(px + 12, py + 1 + bob, 1, 8);
+    ctx.fillStyle = COLORS[a.owner]; ctx.fillRect(px + 13, py + 2 + (visualFrame % 4 === 0 ? 1 : 0), 3, 3);
+    ctx.fillStyle = '#e4c579'; ctx.fillRect(px + 13, py + 2 + (visualFrame % 4 === 0 ? 1 : 0), 1, 1);
     if (a.id === selectedArmyId) {
       ctx.strokeStyle = '#f1d48b'; ctx.lineWidth = 1;
       ctx.strokeRect(px + 1, py + 1, TILE - 2, TILE - 2);
@@ -1150,6 +1281,7 @@ function simulateYear(){
  processDevelopmentAI();processUrbanGrowth();processArmies();processWars();processEconomy();processDynasties();processCivilWars();thinkPolitically();
  if(year%5===0)addEvent('A five-year era begins. Trade, research, and borders continue to change.');
  if(year%10===0){const strongest=[...kingdoms].sort((a,b)=>territoryCount(b.id)-territoryCount(a.id))[0];addEvent(strongest.name+' controls the most territory in year '+year+'.');}
+ syncVillagers();
  renderAll();
 }
 function expandRealm(k){
@@ -1195,6 +1327,7 @@ function applyWorldState(s) {
   opponent = Number.isInteger(s.opponent) ? Math.max(0, Math.min(4, s.opponent)) : (selected + 1) % 5;
   if (opponent === selected) opponent = (selected + 1) % 5;
   events = Array.isArray(s.events) ? s.events : [];
+  villagers = []; nextVillagerId = 1; syncVillagers();
   canvas.width = w * TILE; canvas.height = h * TILE;
   const option = $('mapSize').querySelector('option[value="' + w + '"]'); if (option) $('mapSize').value = String(w);
   renderAll();
@@ -1324,6 +1457,7 @@ $('loadfile').onchange = async e => {
   e.target.value = '';
 };
 if (!loadLocalWorld()) genWorld();
+if (typeof requestAnimationFrame === 'function') requestAnimationFrame(animateVisuals);
 window.addEventListener('resize', () => {
   if (innerWidth > 680) { $('leftPanel').classList.remove('show'); $('rightPanel').classList.remove('show'); }
 });
