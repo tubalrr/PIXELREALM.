@@ -18,6 +18,7 @@ let selected = 0, opponent = 1, events = [], timer = null, seed = 1;
 let diplomacy = { wars: [], alliances: [], tradePacts: [] };
 let armies = [], nextArmyId = 1, selectedArmyId = null;
 let visualFrame = 0, visualLastTimestamp = 0, villagers = [], nextVillagerId = 1;
+let mapZoom = 1;
 
 function rand() { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; }
 function idx(x, y) { return y * w + x; }
@@ -93,6 +94,7 @@ function genWorld() {
   w = Number($('mapSize').value) || 58;
   h = Math.round(w * 0.62);
   canvas.width = w * TILE; canvas.height = h * TILE;
+  setMapZoom(1);
   tiles = Array.from({ length: w * h }, (_, i) => {
     const x = i % w, y = Math.floor(i / w);
     const edge = Math.min(x, y, w - 1 - x, h - 1 - y);
@@ -424,8 +426,29 @@ function drawVillagers() {
     } else drawPixelSprite(leftX, topY, sprite, palette, 1);
   }
 }
+function setMapZoom(nextZoom, anchorX, anchorY) {
+  const viewport = $('mapwrap');
+  if (!viewport) return;
+  const oldWidth = Math.max(1, canvas.clientWidth);
+  const oldHeight = Math.max(1, canvas.clientHeight);
+  const focusX = Number.isFinite(anchorX) ? anchorX : viewport.clientWidth / 2;
+  const focusY = Number.isFinite(anchorY) ? anchorY : viewport.clientHeight / 2;
+  const mapX = (viewport.scrollLeft + focusX) / oldWidth;
+  const mapY = (viewport.scrollTop + focusY) / oldHeight;
+  mapZoom = Math.max(0.5, Math.min(4, Math.round(nextZoom * 4) / 4));
+  canvas.style.width = (mapZoom * 100) + '%';
+  $('zoomRange').value = String(Math.round(mapZoom * 100));
+  $('zoomLabel').textContent = Math.round(mapZoom * 100) + '%';
+  requestAnimationFrame(() => {
+    const newWidth = Math.max(1, canvas.clientWidth);
+    const newHeight = Math.max(1, canvas.clientHeight);
+    viewport.scrollLeft = Math.max(0, mapX * newWidth - focusX);
+    viewport.scrollTop = Math.max(0, mapY * newHeight - focusY);
+  });
+}
 function animateVisuals(timestamp) {
-  if (timestamp - visualLastTimestamp >= 125) {
+  const frameInterval = tiles.length > 10000 ? 250 : tiles.length > 6000 ? 180 : 125;
+  if (timestamp - visualLastTimestamp >= frameInterval) {
     visualLastTimestamp = timestamp;
     visualFrame = (visualFrame + 1) % 16;
     updateVillagers();
@@ -1496,6 +1519,15 @@ $('territory').onclick = () => { showTerritory = !showTerritory; $('territory').
 $('terrain').onclick = () => { showTerrain = !showTerrain; $('terrain').classList.toggle('active', showTerrain); renderMap(); };
 $('eventsToggle').onclick = () => { showEvents = !showEvents; $('eventPanel').style.display = showEvents ? 'block' : 'none'; };
 $('mapSize').onchange = genWorld;
+$('zoomOut').onclick = () => setMapZoom(mapZoom - 0.25);
+$('zoomIn').onclick = () => setMapZoom(mapZoom + 0.25);
+$('zoomFit').onclick = () => setMapZoom(1);
+$('zoomRange').oninput = () => setMapZoom(Number($('zoomRange').value) / 100);
+$('mapwrap').addEventListener('wheel', e => {
+  e.preventDefault();
+  const rect = $('mapwrap').getBoundingClientRect();
+  setMapZoom(mapZoom + (e.deltaY < 0 ? 0.25 : -0.25), e.clientX - rect.left, e.clientY - rect.top);
+}, { passive: false });
 $('save').onclick = () => {
   const blob = new Blob([JSON.stringify(saveData(), null, 2)], { type: 'application/json' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'pixelrealm-world.json'; a.click();
