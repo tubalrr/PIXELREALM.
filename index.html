@@ -38,9 +38,12 @@ main{max-width:1600px;margin:auto;padding:18px;display:grid;gap:14px;grid-templa
     <button data-tool="farm"><span>▥</span>Farm · 25g</button>
     <button data-tool="mine"><span>⛏</span>Mine · 40g</button>
     <button data-tool="market"><span>⌂</span>Market · 60g</button>
-    <button data-tool="upgrade"><span>⬆</span>Upgrade city</button>
+    <button data-tool="upgrade"><span>⬆</span>Upgrade city / district</button>
+    <button data-tool="residential"><span>⌂</span>Homes · 15g</button>
+    <button data-tool="commercial"><span>▤</span>Shops · 25g</button>
+    <button data-tool="industrial"><span>⚙</span>Industry · 35g</button>
    </div>
-   <div class="smallnote" style="margin:8px 0 14px">Build on your selected realm's land. Farms need grassland; mines need mountains or ore; markets need a settlement. City upgrades cost 90g, then 160g.</div>
+   <div class="smallnote" style="margin:8px 0 14px">Zone empty land near towns or roads. Homes add housing capacity; shops and industry earn gold. Districts upgrade to level 3 for denser buildings. Industrial-heavy realms may lose stability.</div>
    <div class="sectionlabel">Simulation</div>
    <div class="toolgroup">
     <button id="play" class="primary"><span>▶</span>Play</button>
@@ -52,7 +55,7 @@ main{max-width:1600px;margin:auto;padding:18px;display:grid;gap:14px;grid-templa
    <label class="smallnote">Map size</label><select id="mapSize"><option value="44">Small — 44 × 28</option><option value="58" selected>Medium — 58 × 36</option><option value="72">Large — 72 × 44</option></select>
    <div style="height:9px"></div><button style="width:100%" id="reset">Reset simulation</button>
    <div class="sectionlabel">How to play</div>
-   <div class="smallnote">Choose a tool, then click a tile. City development tools build roads, farms, mines, and markets or upgrade settlements for the selected kingdom. Press Play to watch kingdoms expand, grow, and develop.</div>
+   <div class="smallnote">Choose a tool, then click a tile. City development tools build roads, farms, mines, markets, and residential/commercial/industrial zones, or upgrade settlements and districts for the selected kingdom. Press Play to watch kingdoms expand, grow, and develop.</div>
   </div>
  </aside>
  <section class="centercol panel">
