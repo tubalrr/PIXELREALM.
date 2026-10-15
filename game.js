@@ -485,7 +485,7 @@ function resolveFieldBattle(army, tile) {
   const defender = realm(tile.owner);
   if (!defender || !warBetween(army.owner, defender.id)) return false;
   const tileIndex = tiles.indexOf(tile), x = tileIndex % w, y = Math.floor(tileIndex / w);
-  const nearby = armies.filter(a => a.owner === defender.id && Math.abs(a.x - x) + Math.abs(a.y - y) <= 1).reduce((sum, a) => sum + a.troops * a.morale / 100, 0);
+  const nearby = armies.filter(a => a.owner === defender.id && Math.abs(a.x - x) + Math.abs(a.y - y) <= 1).reduce((sum, a) => sum + a.troops * a.morale / 100 * (a.formation === 'defensive' ? 1.2 : 1), 0);
   const attackerPower = Math.max(1, army.troops * army.morale / 100 * formationMultiplier(army) + realm(army.owner).tech * 5);
   const defensePower = Math.max(12, defender.military * 0.12 + nearby + (tile.fort ? 48 : 0) + (tile.settlement ? 24 : 0) + defender.tech * 3);
   const winChance = Math.max(0.18, Math.min(0.82, attackerPower / (attackerPower + defensePower)));
@@ -516,7 +516,9 @@ function processArmies() {
     if (!owner || !owner.alive || army.troops <= 0) continue;
     const targetAtWar = army.targetOwner !== null && warBetween(army.owner, army.targetOwner);
     const currentWar = diplomacy.wars.find(war => war.a === army.owner || war.b === army.owner);
-    if (currentWar && army.status !== 'retreating' && (!army.manualOrder || !targetAtWar || army.status === 'guarding' || army.status === 'frontier' || army.status === 'garrisoned')) {
+    const siegeTargetActive = Number.isInteger(army.siegeTile) && tiles[army.siegeTile] && tiles[army.siegeTile].owner === army.targetOwner && targetAtWar && Math.abs(army.x - (army.siegeTile % w)) + Math.abs(army.y - Math.floor(army.siegeTile / w)) <= 1;
+    const targetWasCaptured = Number.isInteger(army.targetIndex) && tiles[army.targetIndex] && tiles[army.targetIndex].owner === army.owner && !siegeTargetActive;
+    if (currentWar && army.status !== 'retreating' && army.status !== 'returning' && (!targetAtWar || army.status === 'guarding' || (army.status === 'frontier' && !siegeTargetActive) || army.status === 'garrisoned' || !Number.isInteger(army.targetIndex) || !tiles[army.targetIndex] || targetWasCaptured)) {
       const enemyIds = [currentWar.a, currentWar.b].filter(id => id !== army.owner);
       const target = enemyIds.map(id => ({ id, goal: armyWarGoal(army, id) })).filter(x => x.goal).sort((a, b) => manhattanIndex(idx(army.x, army.y), a.goal.index) - manhattanIndex(idx(army.x, army.y), b.goal.index))[0];
       if (target) { army.targetOwner = target.id; army.targetIndex = target.goal.index; army.siegeTile = target.goal.siegeTile; army.manualOrder = false; army.status = 'marching'; }
@@ -553,7 +555,9 @@ function processArmies() {
       if (army.status !== 'returning' && army.status !== 'retreating') army.status = defender ? 'attacking' : 'marching';
       if (Number.isInteger(army.siegeTile) && Math.abs(army.x - (army.siegeTile % w)) + Math.abs(army.y - Math.floor(army.siegeTile / w)) <= 1) { army.status = 'besieging'; break; }
     }
-    if (army.status === 'marching' && idx(army.x, army.y) === army.targetIndex) army.status = army.targetOwner !== null ? 'frontier' : 'garrisoned';
+    if (army.status === 'marching' && idx(army.x, army.y) === army.targetIndex) {
+      army.status = Number.isInteger(army.siegeTile) && tiles[army.siegeTile] && tiles[army.siegeTile].owner === army.targetOwner ? 'besieging' : army.targetOwner !== null ? 'frontier' : 'garrisoned';
+    }
     if (army.troops <= 8) {
       owner.military += Math.max(0, Math.floor(army.troops * 0.5)); armies = armies.filter(a => a.id !== army.id);
       if (selectedArmyId === army.id) selectedArmyId = armiesForRealm(selected).length ? armiesForRealm(selected)[0].id : null;
