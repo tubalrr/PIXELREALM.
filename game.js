@@ -752,8 +752,8 @@ function processDevelopmentAI(){
   for(let i=0;i<tiles.length;i++){
    const t=tiles[i]; if(t.owner!==k.id||t.terrain==='water')continue;
    owned.push(i);
-   if(t.terrain==='grass'&&!t.settlement&&!t.building)farms.push(i);
-   if((t.terrain==='mountain'||t.resource==='ore')&&!t.settlement&&!t.building)mines.push(i);
+   if(t.terrain==='grass'&&!t.settlement&&!t.building&&!t.zone)farms.push(i);
+   if((t.terrain==='mountain'||t.resource==='ore')&&!t.settlement&&!t.building&&!t.zone)mines.push(i);
    if(t.settlement&&!t.building)markets.push(i);
    if(t.settlement&&(Number(t.cityLevel)||1)<3)cities.push(i);
    if(!t.road&&neighbours(i%w,Math.floor(i/w)).some(p=>{const n=terrainAt(p[0],p[1]);return n.road||n.settlement;}))roads.push(i);
