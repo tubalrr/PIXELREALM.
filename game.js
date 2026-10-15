@@ -259,10 +259,10 @@ const SPRITES = {
     '..srrrbrss..',
     '.srrrbbbbrs.',
     'ssbbbbbbbbss',
+    '..bbbyybb...',
     '..bbbyybb....',
-    '..bbbyybb....',
-    '..bbbbbbbb...',
-    '...bbbbbb....'
+    '..bbbbbbbb..',
+    '...bbbbbb...'
   ],
   soldier: [
     '.....pp.....',
@@ -335,7 +335,7 @@ function drawTile(t, x, y) {
   } else if (showTerrain && t.terrain === 'forest') {
     ctx.fillStyle = colors[3]; ctx.fillRect(px, py + 12, TILE, 4);
     drawPixelSprite(px + 1, py + 3, SPRITES.tree, { g: '#2f7044', l: '#5d9752', d: '#31573b', b: '#6a5237' }, 1);
-    drawPixelSprite(px + 8, py + 1, SPRITES.pine, { g: '#2b633e', l: '#5c8c4c', d: '#3d6441', b: '#72563a' }, 1);
+    drawPixelSprite(px + 7, py + 1, SPRITES.pine, { g: '#2b633e', l: '#5c8c4c', d: '#3d6441', b: '#72563a' }, 1);
     if (hashTile(x, y, 14) > 0.42) {
       ctx.fillStyle = '#477d49'; ctx.fillRect(px + 2, py + 2, 3, 2);
       ctx.fillStyle = '#649a52'; ctx.fillRect(px + 3, py + 2, 2, 1);
@@ -399,12 +399,12 @@ function drawTile(t, x, y) {
     if (tier === 1) drawPixelSprite(px + 3, py + 4, SPRITES.house, housePalette, 1);
     else if (tier === 2) {
       drawPixelSprite(px + 2, py + 5, SPRITES.house, housePalette, 1);
-      drawPixelSprite(px + 7, py + 1, SPRITES.tallHouse, { ...housePalette, r: '#b9654b', w: '#e0d2ac' }, 1);
+      drawPixelSprite(px + 6, py + 1, SPRITES.tallHouse, { ...housePalette, r: '#b9654b', w: '#e0d2ac' }, 1);
     } else {
       drawPixelSprite(px + 1, py + 5, SPRITES.house, housePalette, 1);
-      drawPixelSprite(px + 7, py + 4, SPRITES.house, { ...housePalette, r: '#a85143' }, 1);
+      drawPixelSprite(px + 6, py + 4, SPRITES.house, { ...housePalette, r: '#a85143' }, 1);
       ctx.fillStyle = '#d7c69f'; ctx.fillRect(px + 8, py, 5, 6);
-      ctx.fillStyle = '#c9b57f'; ctx.fillRect(px + 7, py - 1, 7, 2);
+      ctx.fillStyle = '#c9b57f'; ctx.fillRect(px + 7, py, 7, 2);
       ctx.fillStyle = '#8e4942'; ctx.fillRect(px + 9, py + 2, 1, 2);
     }
   }
