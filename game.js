@@ -400,15 +400,15 @@ function updateVillagers() {
 function drawVillagers() {
   for (const v of villagers) {
     if (!inBounds(Math.floor(v.x), Math.floor(v.y))) continue;
-    const px = Math.round(v.x * TILE), py = Math.round(v.y * TILE);
+    const centerX = Math.round(v.x * TILE), topY = Math.round(v.y * TILE) - 6, leftX = centerX - 4;
     const walking = v.walkPhase > 0 && visualFrame % 4 < 2;
     const sprite = walking ? SPRITES.villagerB : SPRITES.villagerA;
     const palette = { h: '#d6ba8b', p: '#554233', s: COLORS[v.owner], y: '#d4be84', b: '#3b3329' };
-    ctx.fillStyle = '#182018'; ctx.fillRect(px + 3, py + 11, 3, 1);
+    ctx.fillStyle = '#182018'; ctx.fillRect(leftX + 2, topY + 10, 4, 1);
     if (v.facing < 0) {
-      ctx.save(); ctx.translate(px + 8, py + 1); ctx.scale(-1, 1);
+      ctx.save(); ctx.translate(leftX + 8, topY); ctx.scale(-1, 1);
       drawPixelSprite(0, 0, sprite, palette, 1); ctx.restore();
-    } else drawPixelSprite(px + 4, py + 1, sprite, palette, 1);
+    } else drawPixelSprite(leftX, topY, sprite, palette, 1);
   }
 }
 function animateVisuals(timestamp) {
