@@ -184,7 +184,7 @@ function renderKingdoms() {
   $('kingdomList').querySelectorAll('[data-id]').forEach(b => b.onclick = () => {
     selected = Number(b.dataset.id);
     if (opponent === selected) opponent = (selected + 1) % kingdoms.length;
-    renderKingdoms(); renderInfo();
+    renderKingdoms(); renderInfo(); renderMap();
   });
 }
 function meter(label, value, max, color) {
@@ -257,7 +257,7 @@ function renderArmyPanel(k) {
     '<div class="realmmeta"><div><small>Troops</small><strong>' + army.troops.toLocaleString() + '</strong></div><div><small>Morale</small><strong>' + Math.round(army.morale) + '%</strong></div><div><small>Position</small><strong>' + army.x + ', ' + army.y + '</strong></div><div><small>Status</small><strong>' + escapeHtml(armyStatusLabel(army)) + '</strong></div></div>' +
     '<label class="smallnote" for="armyFormation">BATTLE FORMATION</label><select id="armyFormation" style="width:100%;margin:7px 0 10px">' + formations + '</select>' +
     '<div class="actionstack"><button id="recruitArmy">✚ Recruit army<br><small>80 gold · 40 reserve</small></button><button id="marchArmy">⚑ March to target</button><button id="returnArmy">⌂ Return home</button><button id="disbandArmy">↘ Disband army</button></div>' +
-    '<div class="diplomacyhint">Armies move across land each world year. Offensive formations move faster and hit harder; defensive formations are slower but suffer fewer casualties when holding friendly territory.</div>';
+    '<div class="diplomacyhint">Armies move across land each world year. Offensive formations move faster and hit harder; defensive formations trade attack strength for better local defense.</div>';
 }
 function bindArmyControls() {
   const selector = $('armySelect');
