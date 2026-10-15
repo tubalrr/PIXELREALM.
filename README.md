@@ -11,8 +11,11 @@ Download `index.html` and `game.js` into the same folder, then open `index.html`
 - Procedural pixel world with grassland, forests, mountains, and water
 - Five kingdoms, settlements, territory growth, population, economy, food, and technology
 - **City development:** build roads, farms, mines, and markets, and upgrade settlements into level 2 and level 3 cities
-- **Working economy:** farms increase food stores, mines and markets generate treasury income, and upgraded or road-linked cities improve population growth
-- **Kingdom AI development:** realms gradually invest treasury into new farms, roads, markets, mines, and city upgrades
+- **Residential, commercial, and industrial zoning:** lay out town districts on owned land near settlements or roads; each zone has distinct pixel-art buildings and can be upgraded to density level 3
+- **Dynamic city growth:** AI kingdoms expand districts around their towns and roads, then invest in denser districts over time
+- **Working economy:** farms increase food stores, mines and markets generate treasury income, commercial/industrial districts earn recurring gold, and residential districts increase housing capacity and population growth
+- **City visuals:** higher-level settlements gain taller structures; zone sprites visibly grow more dense at levels 2 and 3
+- **Kingdom AI development:** realms gradually invest treasury into new farms, roads, markets, mines, city upgrades, and town districts
 - Play/pause, simulation speed, advance-year, and terrain editing
 - Diplomacy, relationship management, alliances, and AI-negotiated treaties
 - Trade pacts with visible routes and recurring income
@@ -34,14 +37,15 @@ Download `index.html` and `game.js` into the same folder, then open `index.html`
 
 1. Choose a world tool on the left and click a map tile.
 2. Select a realm on the right. The **Field armies** section lets you select a unit and change its formation.
-3. Use the **City development** tools to build on the selected realm's land: roads cost 10 gold, farms 25, mines 40, and markets 60.
+3. Use the **City development** tools on land owned by the selected realm: roads cost 10 gold, farms 25, mines 40, and markets 60.
 4. Farms require empty grassland and add food each year. Mines require a mountain or an ore tile and add treasury income. Markets require a settlement and improve trade income and food stores.
-5. Click **Upgrade city** on a settlement to raise it from level 1 to 2 (90 gold), then level 2 to 3 (160 gold). Higher-level cities improve food, income, and population growth.
-6. AI kingdoms also invest in development over time. The selected realm panel shows its counts of roads, farms, mines, markets, and city upgrades.
-7. Use **Recruit army** to spend 80 treasury and 40 reserve troops to raise a new force.
-8. Choose a target realm in the diplomacy panel and use **March to target** to muster at a nearby frontier in peacetime, or move toward its territory during war.
-9. Use **Return home** to order an army back to its realm's capital. **Disband army** returns half its remaining troops to the reserve.
-10. Use **Play** or **Advance year** to progress the simulation, and **Save world** to download a JSON save that can be imported later.
+5. Use **Homes** (15 gold), **Shops** (25 gold), and **Industry** (35 gold) to zone empty land; commercial zones must connect to a settlement, road, or existing commercial district.
+6. Use **Upgrade city / district** on a settlement to raise it from level 1 to 2 (90 gold), then level 2 to 3 (160 gold). On a zoned district, upgrades cost 50 gold then 100 gold. More homes increase housing capacity; shops and industry provide yearly income.
+7. AI kingdoms automatically zone land near towns and roads and may upgrade districts. The selected realm panel shows counts for each zone and its housing capacity.
+8. Use **Recruit army** to spend 80 treasury and 40 reserve troops to raise a new force.
+9. Choose a target realm in the diplomacy panel and use **March to target** to muster at a nearby frontier in peacetime, or move toward its territory during war.
+10. Use **Return home** to order an army back to its realm's capital. **Disband army** returns half its remaining troops to the reserve.
+11. Use **Play** or **Advance year** to progress the simulation, and **Save world** to download a JSON save that can be imported later.
 
 ## Prototype limitations
 
