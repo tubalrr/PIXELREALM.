@@ -15,6 +15,7 @@ let w = 58, h = 36, tiles = [], kingdoms = [], year = 1, playing = false;
 let showTerritory = true, showTerrain = true, showEvents = true, tool = 'inspect';
 let selected = 0, opponent = 1, events = [], timer = null, seed = 1;
 let diplomacy = { wars: [], alliances: [], tradePacts: [] };
+let armies = [], nextArmyId = 1, selectedArmyId = null;
 
 function rand() { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; }
 function idx(x, y) { return y * w + x; }
@@ -24,6 +25,13 @@ function terrainAt(x, y) { return tiles[idx(x, y)]; }
 function realm(id) { return kingdoms[id]; }
 function territoryCount(id) { let n = 0; for (const t of tiles) if (t.owner === id) n++; return n; }
 function settlementCount(id) { let n = 0; for (const t of tiles) if (t.owner === id && t.settlement) n++; return n; }
+function armiesForRealm(id) { return armies.filter(a => a.owner === id && a.troops > 0); }
+function totalArmyTroops(id) { return armiesForRealm(id).reduce((sum, a) => sum + a.troops, 0); }
+function armyById(id) { return armies.find(a => a.id === id) || null; }
+function armyNearTile(ownerId, tileIndex) { const x = tileIndex % w, y = Math.floor(tileIndex / w); return armies.some(a => a.owner === ownerId && a.troops >= 12 && Math.abs(a.x - x) + Math.abs(a.y - y) <= 1); }
+function hasWarWith(ownerId, otherId) { return !!warBetween(ownerId, otherId); }
+function formationMultiplier(army) { return army.formation === 'offensive' ? 1.22 : army.formation === 'defensive' ? 0.92 : 1; }
+function armyStatusLabel(army) { return ({ guarding: 'Guarding capital', marching: 'Marching', frontier: 'Holding frontier', besieging: 'Besieging target', attacking: 'Advancing', returning: 'Returning home', retreating: 'Retreating', garrisoned: 'Garrisoned', stalled: 'Route blocked' })[army.status] || army.status; }
 function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 function addEvent(text) { events.unshift({ year, text }); events = events.slice(0, 80); renderEvents(); }
 function samePair(t, a, b) { return (t.a === a && t.b === b) || (t.a === b && t.b === a); }
@@ -90,6 +98,13 @@ function genWorld() {
     const home = terrainAt(k.x, k.y);
     home.terrain = 'grass'; home.owner = k.id; home.settlement = true; home.fort = true;
   });
+  armies = []; nextArmyId = 1;
+  kingdoms.forEach(k => {
+    const troops = Math.min(105, Math.max(55, Math.floor(k.military * 0.22)));
+    k.military = Math.max(40, k.military - troops);
+    armies.push({ id: nextArmyId++, owner: k.id, x: k.x, y: k.y, troops, morale: 80 + Math.floor(rand() * 16), formation: 'balanced', targetIndex: null, targetOwner: null, siegeTile: null, status: 'guarding', manualOrder: false, casualties: 0 });
+  });
+  selectedArmyId = armies.length ? armies[0].id : null;
   year = 1; selected = 0; opponent = 1; events = [];
   diplomacy = { wars: [], alliances: [], tradePacts: [] };
   addEvent('Five realms rose across an untamed world. The age of kingdoms begins.');
@@ -138,10 +153,25 @@ function renderMap() {
     ctx.strokeStyle = '#9bc98b'; ctx.beginPath(); ctx.moveTo(a.x * TILE + 8, a.y * TILE + 8); ctx.lineTo(b.x * TILE + 8, b.y * TILE + 8); ctx.stroke();
   });
   ctx.restore();
-  diplomacy.wars.forEach(war => (war.sieges || []).forEach(siege => { const x = siege.tileIndex % w, y = Math.floor(siege.tileIndex / w); if (!tiles[siege.tileIndex]) return; ctx.strokeStyle = '#f5d28a'; ctx.lineWidth = 2; ctx.strokeRect(x * TILE + 2, y * TILE + 2, TILE - 4, TILE - 4); ctx.fillStyle = '#f5d28a'; ctx.fillRect(x * TILE + 5, y * TILE + 5, 6, 2); }));
-  kingdoms.forEach(k => { if (!k.alive) return;
+  diplomacy.wars.forEach(war => (war.sieges || []).forEach(siege => {
+    const x = siege.tileIndex % w, y = Math.floor(siege.tileIndex / w);
+    if (!tiles[siege.tileIndex]) return;
+    ctx.strokeStyle = '#f5d28a'; ctx.lineWidth = 2; ctx.strokeRect(x * TILE + 2, y * TILE + 2, TILE - 4, TILE - 4);
+    ctx.fillStyle = '#f5d28a'; ctx.fillRect(x * TILE + 5, y * TILE + 5, 6, 2);
+  }));
+  kingdoms.forEach(k => {
+    if (!k.alive) return;
     ctx.fillStyle = '#f4e6bd'; ctx.fillRect(k.x * TILE + 5, k.y * TILE + 3, 6, 6);
     ctx.fillStyle = k.color; ctx.fillRect(k.x * TILE + 6, k.y * TILE + 4, 4, 4);
+  });
+  armies.forEach(a => {
+    if (a.troops <= 0 || !realm(a.owner).alive) return;
+    const px = a.x * TILE, py = a.y * TILE;
+    ctx.fillStyle = '#101510'; ctx.fillRect(px + 3, py + 5, 10, 9);
+    ctx.fillStyle = COLORS[a.owner]; ctx.fillRect(px + 5, py + 7, 6, 6);
+    ctx.fillStyle = '#ece9d1'; ctx.fillRect(px + 6, py + 8, 4, 4);
+    ctx.fillStyle = COLORS[a.owner]; ctx.fillRect(px + 10, py + 2, 1, 7); ctx.fillRect(px + 11, py + 2, 4, 3);
+    if (a.id === selectedArmyId) { ctx.strokeStyle = '#f1d48b'; ctx.lineWidth = 1; ctx.strokeRect(px + 1, py + 1, TILE - 2, TILE - 2); }
   });
 }
 function renderKingdoms() {
@@ -197,6 +227,7 @@ function renderInfo() {
     (allyNames.length ? '🤝 Allies: ' + allyNames.map(escapeHtml).join(', ') + '<br>' : '') +
     (tradeNames.length ? '⇄ Trade partners: ' + tradeNames.map(escapeHtml).join(', ') + '<br>' : '') +
     (warNames.length ? '⚔ At war with: ' + warNames.map(escapeHtml).join(', ') : 'No active wars.') + '</div>' +
+    renderArmyPanel(k) +
     '<button id="focusRealm" style="width:100%;margin-top:12px">⌖ Focus capital</button>' +
     '<button id="claimRealm" style="width:100%;margin-top:7px">♜ Claim nearby land</button>';
   $('opponentSelect').onchange = e => { opponent = Number(e.target.value); renderInfo(); };
@@ -210,7 +241,53 @@ function renderInfo() {
     document.querySelectorAll('[data-tool]').forEach(b => b.classList.toggle('active', b.dataset.tool === tool));
     addEvent('Choose an unclaimed land tile to claim for ' + k.name + '.');
   };
+  bindArmyControls();
 }
+
+function renderArmyPanel(k) {
+  const owned = armiesForRealm(k.id);
+  let army = owned.find(a => a.id === selectedArmyId) || owned[0] || null;
+  if (army) selectedArmyId = army.id;
+  if (!k.alive) return '<div class="sectionlabel">Field armies</div><div class="smallnote">This realm has fallen. Its remaining forces no longer take orders.</div>';
+  if (!army) return '<div class="sectionlabel">Field armies</div><div class="smallnote">No field army available.</div><button id="recruitArmy" style="width:100%;margin-top:8px">✚ Recruit army · 80 gold</button>';
+  const options = owned.map(a => '<option value="' + a.id + '" ' + (a.id === army.id ? 'selected' : '') + '>Army #' + a.id + ' · ' + a.troops + ' troops</option>').join('');
+  const formations = ['balanced', 'offensive', 'defensive'].map(f => '<option value="' + f + '" ' + (army.formation === f ? 'selected' : '') + '>' + f.charAt(0).toUpperCase() + f.slice(1) + '</option>').join('');
+  return '<div class="sectionlabel">Field armies <span class="badge">' + owned.length + ' deployed</span></div>' +
+    '<label class="smallnote" for="armySelect">SELECT ARMY</label><select id="armySelect" style="width:100%;margin:7px 0 9px">' + options + '</select>' +
+    '<div class="realmmeta"><div><small>Troops</small><strong>' + army.troops.toLocaleString() + '</strong></div><div><small>Morale</small><strong>' + Math.round(army.morale) + '%</strong></div><div><small>Position</small><strong>' + army.x + ', ' + army.y + '</strong></div><div><small>Status</small><strong>' + escapeHtml(armyStatusLabel(army)) + '</strong></div></div>' +
+    '<label class="smallnote" for="armyFormation">BATTLE FORMATION</label><select id="armyFormation" style="width:100%;margin:7px 0 10px">' + formations + '</select>' +
+    '<div class="actionstack"><button id="recruitArmy">✚ Recruit army<br><small>80 gold · 40 reserve</small></button><button id="marchArmy">⚑ March to target</button><button id="returnArmy">⌂ Return home</button><button id="disbandArmy">↘ Disband army</button></div>' +
+    '<div class="diplomacyhint">Armies move across land each world year. Offensive formations move faster and hit harder; defensive formations are slower but suffer fewer casualties when holding friendly territory.</div>';
+}
+function bindArmyControls() {
+  const selector = $('armySelect');
+  if (selector) selector.onchange = e => { selectedArmyId = Number(e.target.value); renderInfo(); renderMap(); };
+  const formation = $('armyFormation');
+  if (formation) formation.onchange = e => {
+    const army = armyById(selectedArmyId); if (!army) return;
+    army.formation = e.target.value; addEvent('Army #' + army.id + ' changed to ' + army.formation + ' formation.'); renderAll();
+  };
+  const recruit = $('recruitArmy');
+  if (recruit) recruit.onclick = () => { recruitArmyFor(selected); renderAll(); };
+  const march = $('marchArmy');
+  if (march) march.onclick = () => { const army = armyById(selectedArmyId); if (!army) return; orderArmyToBorder(army, opponent); renderAll(); };
+  const back = $('returnArmy');
+  if (back) back.onclick = () => {
+    const army = armyById(selectedArmyId); if (!army) return;
+    const capital = realm(army.owner);
+    army.targetOwner = null; army.targetIndex = idx(capital.x, capital.y); army.siegeTile = null; army.status = 'returning'; army.manualOrder = true;
+    addEvent('Army #' + army.id + ' received orders to return to the capital.'); renderAll();
+  };
+  const disband = $('disbandArmy');
+  if (disband) disband.onclick = () => {
+    const army = armyById(selectedArmyId); if (!army) return;
+    realm(army.owner).military += Math.floor(army.troops * 0.5);
+    armies = armies.filter(a => a.id !== army.id);
+    selectedArmyId = armiesForRealm(selected).length ? armiesForRealm(selected)[0].id : null;
+    addEvent('Army #' + army.id + ' was disbanded. Half of its remaining troops returned to the reserve.'); renderAll();
+  };
+}
+
 function renderEvents() {
   $('eventList').innerHTML = events.map(e => '<div class="event"><time>YEAR ' + String(e.year).padStart(3, '0') + '</time>' + escapeHtml(e.text) + '</div>').join('');
   $('eventCount').textContent = String(events.length).padStart(2, '0');
@@ -222,6 +299,7 @@ function renderAll() {
   $('settleStat').textContent = tiles.filter(t => t.settlement).length;
   $('kingdomStat').textContent = kingdoms.filter(k => k.alive).length;
   if ($('warStat')) $('warStat').textContent = diplomacy.wars.length;
+  if ($('armyStat')) $('armyStat').textContent = armies.filter(a => a.troops > 0 && realm(a.owner) && realm(a.owner).alive).length;
   $('yearStat').textContent = year; $('dateTag').textContent = 'YEAR ' + String(year).padStart(3, '0');
   $('runState').textContent = playing ? '● SIMULATING' : '● PAUSED';
   $('play').innerHTML = playing ? '<span>Ⅱ</span>Pause' : '<span>▶</span>Play';
@@ -312,12 +390,184 @@ function checkCollapse(loser,conqueror){
  addEvent(loser.name+' collapsed as an independent kingdom.'+(conqueror?' '+conqueror.name+' absorbed refugees and part of the royal treasury.':' Its lands became contested frontier.'));
  return true;
 }
+
+function recruitArmyFor(ownerId, automated = false) {
+  const k = realm(ownerId);
+  if (!k || !k.alive || k.treasury < 80 || k.military < 40) {
+    if (!automated) addEvent(k && k.alive ? 'Recruitment requires 80 treasury and 40 reserve troops.' : 'This realm cannot recruit an army.');
+    return null;
+  }
+  k.treasury -= 80; k.military -= 40;
+  const army = { id: nextArmyId++, owner: ownerId, x: k.x, y: k.y, troops: 40, morale: 78, formation: 'balanced', targetIndex: null, targetOwner: null, siegeTile: null, status: 'guarding', manualOrder: false, casualties: 0 };
+  armies.push(army);
+  if (selected === ownerId) selectedArmyId = army.id;
+  if (!automated) addEvent(k.name + ' recruited a new field army (#' + army.id + ') with 40 troops.');
+  return army;
+}
+function manhattanIndex(a, b) { return Math.abs((a % w) - (b % w)) + Math.abs(Math.floor(a / w) - Math.floor(b / w)); }
+function closestFrontierTile(ownerId, targetOwner, fromX, fromY) {
+  const targetLands = [];
+  for (let i = 0; i < tiles.length; i++) if (tiles[i].owner === targetOwner && tiles[i].terrain !== 'water') targetLands.push(i);
+  let best = null, bestScore = Infinity;
+  for (let i = 0; i < tiles.length; i++) {
+    if (tiles[i].owner !== ownerId || tiles[i].terrain === 'water') continue;
+    const ownDist = Math.abs((i % w) - fromX) + Math.abs(Math.floor(i / w) - fromY);
+    let targetDist = Infinity;
+    for (const targetIndex of targetLands) targetDist = Math.min(targetDist, manhattanIndex(i, targetIndex));
+    const score = targetDist * 2 + ownDist * 0.3 + rand() * 0.08;
+    if (score < bestScore) { best = i; bestScore = score; }
+  }
+  return best;
+}
+function armyWarGoal(army, targetOwner) {
+  const enemies = borderTiles(targetOwner, army.owner);
+  if (!enemies.length) return null;
+  let best = null, bestScore = Infinity;
+  for (const enemyIndex of enemies) {
+    const t = tiles[enemyIndex], ex = enemyIndex % w, ey = Math.floor(enemyIndex / w);
+    if ((t.fort || t.settlement) && !t.rebel) {
+      const staging = neighbours(ex, ey).map(p => idx(p[0], p[1])).filter(i => {
+        const tile = tiles[i]; return tile.terrain !== 'water' && (tile.owner === army.owner || tile.owner === -1);
+      });
+      for (const goal of staging) {
+        const score = manhattanIndex(idx(army.x, army.y), goal) - (t.settlement ? 2 : 1) + rand() * 0.35;
+        if (score < bestScore) { bestScore = score; best = { index: goal, siegeTile: enemyIndex }; }
+      }
+    } else {
+      const score = manhattanIndex(idx(army.x, army.y), enemyIndex) + rand() * 0.35;
+      if (score < bestScore) { bestScore = score; best = { index: enemyIndex, siegeTile: null }; }
+    }
+  }
+  return best;
+}
+function orderArmyToBorder(army, targetOwner) {
+  const target = realm(targetOwner), owner = realm(army.owner);
+  if (!target || !target.alive || targetOwner === army.owner) { addEvent('Choose a different living target realm.'); return false; }
+  const war = warBetween(army.owner, targetOwner);
+  if (war) {
+    const goal = armyWarGoal(army, targetOwner);
+    if (!goal) { addEvent('No reachable front currently connects ' + owner.name + ' and ' + target.name + '.'); return false; }
+    army.targetIndex = goal.index; army.siegeTile = goal.siegeTile; army.targetOwner = targetOwner; army.status = 'marching'; army.manualOrder = true;
+    addEvent('Army #' + army.id + ' received orders to march against ' + target.name + '.');
+  } else {
+    const goal = closestFrontierTile(army.owner, targetOwner, army.x, army.y);
+    if (goal === null) { addEvent('No reachable frontier is available for a peaceful march to ' + target.name + '.'); return false; }
+    army.targetIndex = goal; army.siegeTile = null; army.targetOwner = targetOwner; army.status = 'marching'; army.manualOrder = true;
+    addEvent('Army #' + army.id + ' received orders to muster near ' + target.name + '.');
+  }
+  selectedArmyId = army.id;
+  return true;
+}
+function nextPathStep(army, goalIndex) {
+  const start = idx(army.x, army.y);
+  if (start === goalIndex) return start;
+  const parent = new Int32Array(tiles.length); parent.fill(-2);
+  const queue = new Int32Array(tiles.length);
+  let head = 0, tail = 0;
+  queue[tail++] = start; parent[start] = -1;
+  while (head < tail) {
+    const current = queue[head++]; if (current === goalIndex) break;
+    const x = current % w, y = Math.floor(current / w);
+    for (const p of neighbours(x, y)) {
+      const ni = idx(p[0], p[1]), tile = tiles[ni];
+      if (parent[ni] !== -2 || tile.terrain === 'water') continue;
+      if (tile.owner >= 0 && tile.owner !== army.owner && !warBetween(army.owner, tile.owner)) continue;
+      if (tile.owner >= 0 && tile.owner !== army.owner && (tile.fort || tile.settlement) && ni !== goalIndex) continue;
+      parent[ni] = current; queue[tail++] = ni;
+    }
+  }
+  if (parent[goalIndex] === -2) return null;
+  let step = goalIndex;
+  while (parent[step] !== start && parent[step] >= 0) step = parent[step];
+  return step;
+}
+function resolveFieldBattle(army, tile) {
+  const defender = realm(tile.owner);
+  if (!defender || !warBetween(army.owner, defender.id)) return false;
+  const tileIndex = tiles.indexOf(tile), x = tileIndex % w, y = Math.floor(tileIndex / w);
+  const nearby = armies.filter(a => a.owner === defender.id && Math.abs(a.x - x) + Math.abs(a.y - y) <= 1).reduce((sum, a) => sum + a.troops * a.morale / 100, 0);
+  const attackerPower = Math.max(1, army.troops * army.morale / 100 * formationMultiplier(army) + realm(army.owner).tech * 5);
+  const defensePower = Math.max(12, defender.military * 0.12 + nearby + (tile.fort ? 48 : 0) + (tile.settlement ? 24 : 0) + defender.tech * 3);
+  const winChance = Math.max(0.18, Math.min(0.82, attackerPower / (attackerPower + defensePower)));
+  if (rand() < winChance) {
+    const losses = Math.max(2, Math.floor(army.troops * (0.07 + rand() * 0.11)));
+    army.troops = Math.max(1, army.troops - losses); army.casualties += losses; army.morale = Math.max(30, army.morale - 5);
+    tile.owner = army.owner; tile.rebel = false; tile.fort = false;
+    if (tile.settlement) { realm(army.owner).population += 180; defender.population = Math.max(200, defender.population - 180); }
+    defender.military = Math.max(0, defender.military - Math.floor(4 + rand() * 8));
+    addEvent('Army #' + army.id + ' (' + realm(army.owner).name + ') won a field battle and captured enemy territory.');
+    checkCollapse(defender, realm(army.owner));
+    return true;
+  }
+  const losses = Math.min(army.troops - 1, Math.max(3, Math.floor(army.troops * (0.16 + rand() * 0.18))));
+  army.troops -= losses; army.casualties += losses; army.morale = Math.max(12, army.morale - 15); army.status = 'retreating';
+  army.targetIndex = idx(realm(army.owner).x, realm(army.owner).y); army.targetOwner = null; army.siegeTile = null; army.manualOrder = true;
+  defender.military = Math.max(0, defender.military - Math.floor(2 + rand() * 5));
+  addEvent('Army #' + army.id + ' was repelled by ' + defender.name + ' and lost ' + losses + ' troops.');
+  return false;
+}
+function processArmies() {
+  for (const war of diplomacy.wars) for (const ownerId of [war.a, war.b]) {
+    const k = realm(ownerId);
+    if (k && k.alive && armiesForRealm(ownerId).length < 2 && k.military >= 80 && k.treasury >= 150 && rand() < 0.15) recruitArmyFor(ownerId, true);
+  }
+  for (const army of [...armies]) {
+    const owner = realm(army.owner);
+    if (!owner || !owner.alive || army.troops <= 0) continue;
+    const targetAtWar = army.targetOwner !== null && warBetween(army.owner, army.targetOwner);
+    const currentWar = diplomacy.wars.find(war => war.a === army.owner || war.b === army.owner);
+    if (currentWar && army.status !== 'retreating' && (!army.manualOrder || !targetAtWar || army.status === 'guarding' || army.status === 'frontier' || army.status === 'garrisoned')) {
+      const enemyIds = [currentWar.a, currentWar.b].filter(id => id !== army.owner);
+      const target = enemyIds.map(id => ({ id, goal: armyWarGoal(army, id) })).filter(x => x.goal).sort((a, b) => manhattanIndex(idx(army.x, army.y), a.goal.index) - manhattanIndex(idx(army.x, army.y), b.goal.index))[0];
+      if (target) { army.targetOwner = target.id; army.targetIndex = target.goal.index; army.siegeTile = target.goal.siegeTile; army.manualOrder = false; army.status = 'marching'; }
+    } else if (!currentWar && !army.manualOrder && army.status !== 'returning' && army.status !== 'retreating') {
+      army.targetOwner = null; army.targetIndex = null; army.siegeTile = null; army.status = 'guarding';
+    }
+    if (army.status === 'guarding' || army.status === 'frontier' || army.status === 'besieging' || army.troops <= 0) {
+      if (army.status === 'besieging' && (!Number.isInteger(army.siegeTile) || !tiles[army.siegeTile] || tiles[army.siegeTile].owner === army.owner)) {
+        army.status = 'marching'; army.targetIndex = null; army.siegeTile = null; army.manualOrder = false;
+      } else continue;
+    }
+    if (!Number.isInteger(army.targetIndex) || !tiles[army.targetIndex]) {
+      if (army.targetOwner !== null && warBetween(army.owner, army.targetOwner)) {
+        const goal = armyWarGoal(army, army.targetOwner);
+        if (goal) { army.targetIndex = goal.index; army.siegeTile = goal.siegeTile; }
+      } else if (army.status === 'returning' || army.status === 'retreating') {
+        army.targetIndex = idx(owner.x, owner.y);
+      } else if (army.targetOwner !== null) {
+        army.targetIndex = closestFrontierTile(army.owner, army.targetOwner, army.x, army.y);
+      }
+    }
+    if (!Number.isInteger(army.targetIndex)) { army.status = 'guarding'; continue; }
+    const steps = army.formation === 'offensive' ? 2 : 1;
+    for (let n = 0; n < steps; n++) {
+      const current = idx(army.x, army.y); if (current === army.targetIndex) break;
+      const next = nextPathStep(army, army.targetIndex);
+      if (next === null) { army.status = 'stalled'; break; }
+      const tile = tiles[next], defender = tile.owner >= 0 && tile.owner !== army.owner ? realm(tile.owner) : null;
+      if (defender && !warBetween(army.owner, defender.id)) { army.status = 'frontier'; break; }
+      if (defender && (tile.fort || tile.settlement)) { army.x = next % w; army.y = Math.floor(next / w); army.status = 'besieging'; break; }
+      if (defender && !resolveFieldBattle(army, tile)) break;
+      army.x = next % w; army.y = Math.floor(next / w);
+      if (army.status === 'retreating') break;
+      if (army.status !== 'returning' && army.status !== 'retreating') army.status = defender ? 'attacking' : 'marching';
+      if (Number.isInteger(army.siegeTile) && Math.abs(army.x - (army.siegeTile % w)) + Math.abs(army.y - Math.floor(army.siegeTile / w)) <= 1) { army.status = 'besieging'; break; }
+    }
+    if (army.status === 'marching' && idx(army.x, army.y) === army.targetIndex) army.status = army.targetOwner !== null ? 'frontier' : 'garrisoned';
+    if (army.troops <= 8) {
+      owner.military += Math.max(0, Math.floor(army.troops * 0.5)); armies = armies.filter(a => a.id !== army.id);
+      if (selectedArmyId === army.id) selectedArmyId = armiesForRealm(selected).length ? armiesForRealm(selected)[0].id : null;
+      addEvent('Army #' + army.id + ' disbanded after severe losses; survivors returned to the reserve.');
+    }
+  }
+}
+
 function processSieges(war,a,b){
  war.sieges=Array.isArray(war.sieges)?war.sieges:[];
  for(const attacker of [a,b]){
   const defender=attacker.id===a.id?b:a;
   if(!attacker.alive||!defender.alive||war.sieges.some(s=>s.attacker===attacker.id)||rand()>.42)continue;
-  const candidates=borderTiles(defender.id,attacker.id).filter(i=>(tiles[i].settlement||tiles[i].fort)&&!war.sieges.some(s=>s.tileIndex===i));
+  const candidates=borderTiles(defender.id,attacker.id).filter(i=>(tiles[i].settlement||tiles[i].fort)&&!war.sieges.some(s=>s.tileIndex===i)&&armyNearTile(attacker.id,i));
   if(!candidates.length)continue;
   const tileIndex=candidates[Math.floor(rand()*candidates.length)];
   war.sieges.push({tileIndex,attacker:attacker.id,defender:defender.id,progress:0,started:year});
@@ -328,15 +578,21 @@ function processSieges(war,a,b){
   if(!tile||!attacker||!defender||!attacker.alive||!defender.alive||tile.owner!==defender.id||!borderTiles(defender.id,attacker.id).includes(siege.tileIndex)){
    war.sieges=war.sieges.filter(s=>s!==siege);continue;
   }
+  if(!armyNearTile(attacker.id,siege.tileIndex))continue;
+  const siegeArmy=armiesForRealm(attacker.id).filter(army=>Math.abs(army.x-(siege.tileIndex%w))+Math.abs(army.y-Math.floor(siege.tileIndex/w))<=1).sort((x,y)=>y.troops-x.troops)[0];
+  if(!siegeArmy)continue;
   const defense=Math.max(1,defender.military*.12+(tile.fort?24:0)+(tile.settlement?15:0)+defender.tech*2);
-  const attack=Math.max(1,attacker.military*.14+attacker.tech*3);
-  siege.progress=Math.min(100,siege.progress+Math.max(5,Math.min(24,13+(attack-defense)*.12+rand()*6)));
+  const attack=Math.max(1,siegeArmy.troops*siegeArmy.morale/100*formationMultiplier(siegeArmy)*.34+attacker.tech*3);
+  siege.progress=Math.min(100,siege.progress+Math.max(3,Math.min(24,13+(attack-defense)*.12+rand()*6)));
   if(siege.progress>=100){
-   tile.owner=attacker.id;tile.rebel=false;setSideScore(war,attacker.id,Math.min(100,sideScore(war,attacker.id)+18));
+   tile.owner=attacker.id;tile.rebel=false;tile.fort=false;
+   setSideScore(war,attacker.id,Math.min(100,sideScore(war,attacker.id)+18));
    attacker.treasury+=tile.settlement?14:5;defender.stability=Math.max(5,defender.stability-(tile.settlement?8:4));
-   attacker.military=Math.max(35,attacker.military-5);defender.military=Math.max(35,defender.military-12);
-   addEvent(attacker.name+' captured a fortified district held by '+defender.name+' after a siege.');
-   war.sieges=war.sieges.filter(s=>s!==siege);checkCollapse(defender,attacker);
+   const casualties=Math.floor(3+rand()*9);siegeArmy.troops=Math.max(1,siegeArmy.troops-casualties);siegeArmy.casualties+=casualties;
+   attacker.military=Math.max(0,attacker.military-5);defender.military=Math.max(0,defender.military-12);
+   addEvent(attacker.name+' captured a fortified district held by '+defender.name+' after an army-led siege.');
+   war.sieges=war.sieges.filter(s=>s!==siege);siegeArmy.status='marching';siegeArmy.targetIndex=null;siegeArmy.siegeTile=null;siegeArmy.manualOrder=false;
+   checkCollapse(defender,attacker);
   }
  }
 }
@@ -431,7 +687,7 @@ function processCivilWars(){
   }
  }
 }
-function realmStrength(k){return Math.max(1,k.military*(1+k.tech*.04)+territoryCount(k.id)*1.8);}
+function realmStrength(k){return Math.max(1,k.military*(1+k.tech*.04)+territoryCount(k.id)*1.8+totalArmyTroops(k.id)*.8);}
 function thinkPolitically(){
  for(let i=0;i<kingdoms.length;i++)for(let j=i+1;j<kingdoms.length;j++){
   const a=realm(i),b=realm(j);if(!a.alive||!b.alive)continue;
@@ -481,7 +737,7 @@ function simulateYear(){
   if(rand()<.74)expandRealm(k);
   if(rand()<.025){k.stability=Math.max(5,k.stability-Math.floor(rand()*10+3));addEvent('Unrest troubles '+k.name+'; stability falls to '+k.stability+'.');}
  }
- processWars();processEconomy();processDynasties();processCivilWars();thinkPolitically();
+ processArmies();processWars();processEconomy();processDynasties();processCivilWars();thinkPolitically();
  if(year%5===0)addEvent('A five-year era begins. Trade, research, and borders continue to change.');
  if(year%10===0){const strongest=[...kingdoms].sort((a,b)=>territoryCount(b.id)-territoryCount(a.id))[0];addEvent(strongest.name+' controls the most territory in year '+year+'.');}
  renderAll();
@@ -499,7 +755,7 @@ function expandRealm(k){
  if(rand()<.055){t.settlement=true;k.population+=Math.floor(300+rand()*900);addEvent(k.name+' founded a new frontier settlement.');}
  else if(rand()<.04)t.fort=true;
 }
-function saveData() { return { version: 3, w, h, year, tiles, kingdoms, events, selected, opponent, diplomacy }; }
+function saveData() { return { version: 4, w, h, year, tiles, kingdoms, events, selected, opponent, diplomacy, armies, nextArmyId, selectedArmyId }; }
 function saveLocalWorld() { try { localStorage.setItem('pixelrealm-autosave', JSON.stringify(saveData())); } catch (err) { /* Browser storage can be unavailable for local files/private browsing. */ } }
 function applyWorldState(s) {
   if (!s || !Array.isArray(s.tiles) || !Array.isArray(s.kingdoms) || !Number.isInteger(s.w) || !Number.isInteger(s.h) || s.tiles.length !== s.w * s.h || s.kingdoms.length !== 5) throw new Error('Invalid save');
@@ -514,6 +770,10 @@ function applyWorldState(s) {
   const d = s.diplomacy || {};
   diplomacy = { wars: Array.isArray(d.wars) ? d.wars : [], alliances: Array.isArray(d.alliances) ? d.alliances : [], tradePacts: Array.isArray(d.tradePacts) ? d.tradePacts : [] };
   diplomacy.wars.forEach(war => { war.sieges = Array.isArray(war.sieges) ? war.sieges : []; war.exhaustionA = Number.isFinite(war.exhaustionA) ? war.exhaustionA : 0; war.exhaustionB = Number.isFinite(war.exhaustionB) ? war.exhaustionB : 0; war.campaigns = war.campaigns || 0; });
+  armies = Array.isArray(s.armies) ? s.armies.filter(a => a && Number.isInteger(a.owner) && a.owner >= 0 && a.owner < 5 && Number.isFinite(a.x) && Number.isFinite(a.y)).map(a => ({ ...a, formation: ['balanced','offensive','defensive'].includes(a.formation) ? a.formation : 'balanced', morale: Number.isFinite(a.morale) ? a.morale : 75, troops: Number.isFinite(a.troops) ? a.troops : 40, targetIndex: Number.isInteger(a.targetIndex) ? a.targetIndex : null, targetOwner: Number.isInteger(a.targetOwner) ? a.targetOwner : null, siegeTile: Number.isInteger(a.siegeTile) ? a.siegeTile : null, status: a.status || 'guarding', manualOrder: !!a.manualOrder, casualties: Number.isFinite(a.casualties) ? a.casualties : 0 })) : [];
+  nextArmyId = Math.max(Number(s.nextArmyId) || 1, armies.reduce((m, a) => Math.max(m, a.id + 1), 1));
+  if (!armies.length) { nextArmyId = 1; kingdoms.forEach(k => { if (!k.alive) return; const troops = Math.min(90, Math.max(35, Math.floor(k.military * 0.18))); k.military = Math.max(20, k.military - troops); armies.push({ id: nextArmyId++, owner: k.id, x: k.x, y: k.y, troops, morale: 80, formation: 'balanced', targetIndex: null, targetOwner: null, siegeTile: null, status: 'guarding', manualOrder: false, casualties: 0 }); }); }
+  selectedArmyId = Number.isInteger(s.selectedArmyId) && armies.some(a => a.id === s.selectedArmyId) ? s.selectedArmyId : (armiesForRealm(Number(s.selected) || 0)[0]?.id ?? null);
   selected = Math.max(0, Math.min(4, Number(s.selected) || 0));
   opponent = Number.isInteger(s.opponent) ? Math.max(0, Math.min(4, s.opponent)) : (selected + 1) % 5;
   if (opponent === selected) opponent = (selected + 1) % 5;
@@ -567,6 +827,7 @@ $('newWorld').onclick = genWorld;
 $('reset').onclick = () => {
   stopSimulation(); year = 1;
   kingdoms.forEach(k => { k.population = 5000; k.treasury = 200; k.military = 250; k.stability = 80; k.food = 150; k.tech = 1; k.rulerAge = 35; k.warExhaustion = 0; k.civilWar = null; k.alive = true; });
+  armies = []; nextArmyId = 1; kingdoms.forEach(k => { const troops = 55; k.military = Math.max(40, k.military - troops); armies.push({ id: nextArmyId++, owner: k.id, x: k.x, y: k.y, troops, morale: 80, formation: 'balanced', targetIndex: null, targetOwner: null, siegeTile: null, status: 'guarding', manualOrder: false, casualties: 0 }); }); selectedArmyId = armiesForRealm(selected).length ? armiesForRealm(selected)[0].id : null;
   diplomacy = { wars: [], alliances: [], tradePacts: [] }; addEvent('The simulation has been reset.'); renderAll();
 };
 $('territory').onclick = () => { showTerritory = !showTerritory; $('territory').classList.toggle('active', showTerritory); renderMap(); };
