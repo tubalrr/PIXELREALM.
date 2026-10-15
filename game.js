@@ -787,12 +787,21 @@ function processUrbanGrowth() {
       if (t.zone === 'industrial') industrial.push(i);
       if (t.zone && (Number(t.zoneLevel) || 1) < 3) upgradeable.push(i);
     }
+    const urbanArea = new Set();
+    cities.forEach(ci => {
+      const cx = ci % w, cy = Math.floor(ci / w);
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+        if (Math.abs(dx) + Math.abs(dy) > 2) continue;
+        const x = cx + dx, y = cy + dy;
+        if (inBounds(x, y)) urbanArea.add(idx(x, y));
+      }
+    });
     const buildable = [];
     for (let i = 0; i < tiles.length; i++) {
       const t = tiles[i];
       if (t.owner !== k.id || t.terrain === 'water' || t.terrain === 'mountain' || t.settlement || t.building || t.zone) continue;
       const x = i % w, y = Math.floor(i / w);
-      const nearCity = cities.some(ci => Math.abs(ci % w - x) + Math.abs(Math.floor(ci / w) - y) <= 2);
+      const nearCity = urbanArea.has(i);
       const nearRoad = neighbours(x, y).some(p => terrainAt(p[0], p[1]).road);
       if (nearCity || nearRoad) buildable.push(i);
     }
