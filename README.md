@@ -8,7 +8,9 @@ Download `index.html` and `game.js` into the same folder, then open `index.html`
 
 ## Features
 
-- Procedural pixel world with grassland, forests, mountains, and water
+- Procedural pixel world with hand-drawn 16×16 pixel-art terrain, shoreline sand, water highlights, grass flecks, pine clusters, and snowy mountain tiles
+- Crisp low-resolution sprites rendered without smoothing, including homes, upgraded city skylines, markets, farms, mines, forts, and realm-colored field soldiers
+- Pixel-art presentation with hard-edge panels, squared HUD controls, and a monospace interface
 - Five kingdoms, settlements, territory growth, population, economy, food, and technology
 - **City development:** build roads, farms, mines, and markets, and upgrade settlements into level 2 and level 3 cities
 - **Residential, commercial, and industrial zoning:** lay out town districts on owned land near settlements or roads; each zone has distinct pixel-art buildings and can be upgraded to density level 3
@@ -49,4 +51,4 @@ Download `index.html` and `game.js` into the same folder, then open `index.html`
 
 ## Prototype limitations
 
-This is an early client-side prototype. Armies are represented as compact map markers, not detailed animated soldiers. Battle outcomes and political events use lightweight simulation rules rather than a full historical or economic model. There is no multiplayer, cloud save, user account system, or online community backend yet.
+This is an early client-side prototype. Terrain and building graphics are handmade pixel patterns drawn directly on the canvas, rather than external sprite images. Armies use small pixel-art soldier markers; individual soldiers are not yet animated. Battle outcomes and political events use lightweight simulation rules rather than a full historical or economic model. There is no multiplayer, cloud save, user account system, or online community backend yet.
