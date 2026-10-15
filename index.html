@@ -36,6 +36,7 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges}
 .event{border-bottom:1px solid #344a34}
 .toolgroup button{border-radius:0}
 
+ .live-mark{color:#a8c887;letter-spacing:1px}.live-mark:before{content:"";display:inline-block;width:5px;height:5px;margin:0 4px 1px 0;background:#a8c887;box-shadow:0 0 0 1px #263c29;vertical-align:middle}
 </style>
 </head>
 <body>
@@ -83,7 +84,7 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges}
  </aside>
  <section class="centercol panel">
   <div class="panelhead"><span>World map <span style="color:var(--gold)">/ REALM VIEW</span></span><span id="runState">● PAUSED</span></div>
-  <div class="mapframe"><div class="mapwrap"><canvas id="world" width="928" height="576" aria-label="Interactive pixel world map"></canvas><div class="maptag">THE KNOWN WORLD <span style="color:var(--gold)">◆</span> <span id="coords">X 00 · Y 00</span></div></div></div>
+  <div class="mapframe"><div class="mapwrap"><canvas id="world" width="928" height="576" aria-label="Interactive pixel world map"></canvas><div class="maptag"><span class="live-mark">● LIVE PIXELS</span> <span style="color:var(--gold)">◆</span> <span id="coords">X 00 · Y 00</span></div></div></div>
   <div class="mapbottom"><button id="territory" class="active">▦ Territory</button><button id="terrain">◈ Terrain</button><button id="eventsToggle">▤ Events</button><button id="save">↓ Save world</button><button id="load">↑ Load world</button><input type="file" id="loadfile" accept="application/json" hidden></div>
   <div class="stats">
    <div class="stat"><small>Population</small><strong id="popStat">—</strong></div>
