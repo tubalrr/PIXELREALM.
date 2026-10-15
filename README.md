@@ -36,6 +36,12 @@ Download `index.html` and `game.js` into the same folder, then open `index.html`
 - Browser autosave when supported, plus downloadable/importable JSON world saves
 - Backward migration for older local save files
 
+## Map size and zoom
+
+- Choose from Small (44 × 28) through Massive (144 × 89) to generate a much larger world.
+- Use − / + or the zoom slider to zoom from 50% to 400%. The Fit map button returns to 100% width; the mouse wheel over the map also zooms.
+- When zoomed in, use the map area's scrollbars to explore other areas. Large maps throttle visual-only animations slightly to preserve responsiveness.
+
 ## Controls
 
 1. Choose a world tool on the left and click a map tile.
